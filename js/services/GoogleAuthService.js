@@ -250,16 +250,12 @@
         try {
           accounts = await window.SIGR.StorageService.getSetting(ACC_CFG_KEY, []);
         } catch(e) {}
-        this._accounts = Array.isArray(accounts) ? accounts : [];
-        try {
-          const bundled = await fetch('secure/service-account.json', { cache: 'no-store' });
-          if (bundled.ok) {
-            const sa = await bundled.json();
-            if (sa && sa.client_email && sa.private_key && !this._accounts.find(a => a.type === 'sa' && a.email === sa.client_email)) {
-              this._accounts.unshift(this._fromServiceAccountJson(sa, 'Cuenta integrada'));
-            }
-          }
-        } catch(e) {}
+        const raw = Array.isArray(accounts) ? accounts : [];
+        accounts = raw.filter(a => a && a.type !== 'sa');
+        if (accounts.length !== raw.length) {
+          try { await window.SIGR.StorageService.setSetting(ACC_CFG_KEY, accounts); } catch(e) {}
+        }
+        this._accounts = accounts;
       })();
       return this._ready;
     },

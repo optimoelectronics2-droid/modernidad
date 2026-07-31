@@ -148,14 +148,15 @@
             if (res.userCode) {
               this._state.flow = res;
               const body = `<div style="text-align:center;padding:12px 0">
-                <div style="font-size:13px;color:var(--text-dim);margin-bottom:10px">Abre este enlace (en el navegador o en el móvil), elige tu cuenta de Google y acepta los permisos:</div>
-                <div style="font-size:15px;font-weight:800;color:var(--c-personal,#9C8CFF);margin-bottom:10px;word-break:break-all"><a href="${esc(res.verificationUrl)}" target="_blank">${esc(res.verificationUrl)}</a></div>
+                <div style="font-size:13px;color:var(--text-dim);margin-bottom:10px">Toca el botón para abrir Google, escribe el código y acepta los permisos:</div>
+                <button class="btn" data-action="bsOpenDevicePage" style="width:100%;margin-bottom:12px">🌐 Abrir página de Google</button>
                 <div style="font-size:34px;font-weight:800;letter-spacing:8px;color:#12D68A;margin-bottom:10px">${esc(res.userCode)}</div>
                 <button class="btn btn-ghost" data-action="bsCopyUserCode" style="font-size:12px;margin-bottom:12px">📋 Copiar código</button>
                 <div id="bsDeviceStatus" style="font-size:12px;color:var(--text-faint)">Esperando autorización…</div>
                 <div style="font-size:11px;color:var(--text-faint);margin-top:12px">Si ves "Acceso bloqueado": consola de Google → Pantalla de consentimiento → Usuarios de prueba → añade tu correo y vuelve a intentarlo.</div>
               </div>`;
               window.openModal({ title: 'Iniciar sesión con Google', body, closeOnOverlay: false });
+              try { await navigator.clipboard.writeText(res.userCode); } catch(e) {}
               this._pollDevice(res);
             } else {
               showToast('Sesión iniciada: ' + (res.email || 'Google') + ' ✓');
@@ -172,6 +173,13 @@
             showToast(e.message || 'No se pudo iniciar sesión');
             btn.disabled = false;
           }
+          break;
+        }
+
+        case 'bsOpenDevicePage': {
+          const flow = this._state.flow;
+          if (!flow) return;
+          window.open(flow.verificationUrl, '_blank', 'noopener');
           break;
         }
 
