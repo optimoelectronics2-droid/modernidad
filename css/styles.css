@@ -936,3 +936,16 @@ select.form-input{appearance:none;-webkit-appearance:none;background-image:url("
 .app-topbar .at-search-bar.open{display:flex;}
 .app-topbar .at-search-bar input{flex:1;padding:10px 14px;border-radius:12px;background:var(--surface);border:1px solid var(--border);font-size:15px;color:var(--text);outline:none;font-family:inherit;}
 .app-topbar .at-search-bar input:focus{border-color:rgba(156,140,255,0.4);}
+
+/* SYNC BADGE (floating) */
+.sync-badge{position:fixed;bottom:calc(14px + var(--safe-bottom,0px));right:14px;z-index:60;display:flex;align-items:center;gap:7px;padding:8px 14px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.35);border:1px solid var(--border);backdrop-filter:blur(8px);transition:all .15s ease;max-width:min(78vw,340px);}
+.sync-badge:hover{transform:translateY(-1px);}
+.sync-badge .sb-icon{flex-shrink:0;font-size:13px;}
+.sync-badge .sb-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sync-badge.ok{background:rgba(18,214,138,.14);color:#12D68A;border-color:rgba(18,214,138,.35);}
+.sync-badge.sync{background:rgba(92,168,255,.14);color:#5CA8FF;border-color:rgba(92,168,255,.35);}
+.sync-badge.sync .sb-icon{animation:syncspin 1.2s linear infinite;display:inline-block;}
+.sync-badge.err{background:rgba(251,90,126,.14);color:#FB5A7E;border-color:rgba(251,90,126,.35);}
+.sync-badge.warn{background:rgba(245,166,35,.14);color:#F5A623;border-color:rgba(245,166,35,.35);}
+.sync-badge.off{background:rgba(255,255,255,.06);color:var(--text-dim);border-color:var(--border);}
+@keyframes syncspin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}

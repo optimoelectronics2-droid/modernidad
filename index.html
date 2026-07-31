@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -7,13 +7,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0A0C12">
-<meta name="description" content="Sistema Inteligente de Gestión de Registros - Gestión personal y empresarial">
+<meta name="description" content="Sistema Inteligente de GestiÃ³n de Registros - GestiÃ³n personal y empresarial">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%239C8CFF'/><text x='16' y='22' font-size='18' font-weight='800' text-anchor='middle' fill='%230A0C12' font-family='sans-serif'>S</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css?v=3">
-<title>SIGR Pro - Gestión Inteligente</title>
+<link rel="stylesheet" href="css/styles.css?v=4">
+<title>SIGR Pro - GestiÃ³n Inteligente</title>
 <style>
   /* Critical inline styles for first paint */
   body{background:#0A0C12;color:#EEF0F6;font-family:'Manrope',sans-serif;margin:0;padding:0;}
@@ -24,11 +24,11 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading-screen"><div class="ls-icon">⚡</div><div class="ls-text">Cargando SIGR Pro...</div></div></div>
+<div id="app"><div class="loading-screen"><div class="ls-icon">âš¡</div><div class="ls-text">Cargando SIGR Pro...</div></div></div>
 <div id="toast"></div>
 <div id="modal"></div>
 <div id="sidebarOverlay" onclick="window.closeSidebar()"></div>
-<div id="sidebar"><div class="sidebar-inner"><div class="sidebar-header"><div class="sidebar-brand">⚡ SIGR Pro</div><button class="sidebar-close" onclick="window.closeSidebar()">✖</button></div><div class="sidebar-nav" id="sidebarNav"></div></div></div>
+<div id="sidebar"><div class="sidebar-inner"><div class="sidebar-header"><div class="sidebar-brand">âš¡ SIGR Pro</div><button class="sidebar-close" onclick="window.closeSidebar()">âœ–</button></div><div class="sidebar-nav" id="sidebarNav"></div></div></div>
 <div id="notificationFallback"></div>
 
 <script>window.addEventListener('unhandledrejection',function(e){console.warn('Unhandled:',e.reason);});</script>
@@ -67,7 +67,7 @@
 <script src="js/views/agendaView.js?v=3"></script>
 <script src="js/views/vaultView.js?v=3"></script>
 <script src="js/views/backupSettings.js?v=5"></script>
-<script src="js/app.js?v=3"></script>
+<script src="js/app.js?v=4"></script>
 
 <script>
 /* Minimal bootstrap to handle legacy window.storage API */

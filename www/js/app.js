@@ -1550,6 +1550,38 @@
   function closeSidebar(){ document.getElementById('sidebar')?.classList.remove('open'); document.getElementById('sidebarOverlay')?.classList.remove('open'); }
   function toggleSidebar(){ if(document.getElementById('sidebar')?.classList.contains('open')) closeSidebar(); else openSidebar(); }
 
+  /* ============ SYNC STATUS BADGE (floating, always visible) ============ */
+  function updateSyncBadge(status){
+    if(!status) return;
+    const st = status || {};
+    const accounts = window.SIGR.GoogleAuthService ? window.SIGR.GoogleAuthService.getAccounts() : [];
+    const hasConfig = accounts.length > 0;
+    const visible = hasConfig || st.state === 'error' || st.state === 'passphrase-required';
+    let badge = document.getElementById('syncBadge');
+    if(!badge){
+      badge = document.createElement('div');
+      badge.id = 'syncBadge';
+      badge.addEventListener('click', () => { try { openBackupSettingsView(); } catch(e) {} });
+      document.body.appendChild(badge);
+    }
+    if(!visible){
+      badge.style.display = 'none';
+      return;
+    }
+    badge.style.display = 'flex';
+    let icon = '\u2601\uFE0F', text = 'Sincronizado', cls = 'ok';
+    if(st.state === 'backing-up'){ icon = '\uD83D\uDD04'; text = 'Sincronizando\u2026'; cls = 'sync'; }
+    else if(st.state === 'error'){ icon = '\u26A0\uFE0F'; text = 'Error de sincronizaci\u00F3n'; cls = 'err'; }
+    else if(st.state === 'passphrase-required'){ icon = '\uD83D\uDD10'; text = 'Contrase\u00F1a requerida'; cls = 'warn'; }
+    else if(!navigator.onLine){ icon = '\uD83D\uDEAB'; text = 'Sin conexi\u00F3n'; cls = 'off'; }
+    else {
+      const last = st.lastResult && st.lastResult.name ? st.lastResult.name : '';
+      text = 'Sincronizado' + (last ? ' \u00B7 ' + last : '');
+    }
+    badge.className = 'sync-badge ' + cls;
+    badge.innerHTML = '<span class="sb-icon">' + icon + '</span><span class="sb-text">' + esc(text) + '</span>';
+  }
+
   /* ============ BACKUP SETTINGS VIEW (reusable) ============ */
   async function openBackupSettingsView(){
     const html = await window.SIGR.BackupSettingsView.render();
@@ -1739,6 +1771,8 @@
       await window.SIGR.EmailService.loadConfig();
       try {
         await window.SIGR.SyncManager.init();
+        window.SIGR.SyncManager.onChange(st => updateSyncBadge(st));
+        updateSyncBadge(window.SIGR.SyncManager.getStatus());
       } catch(e) {
         console.warn('SyncManager init:', e);
       }
