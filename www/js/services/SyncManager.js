@@ -93,8 +93,15 @@
       try {
         const cfg = await window.SIGR.BackupService.getConfig();
         const accounts = window.SIGR.GoogleAuthService.getAccounts();
-        if (!cfg.activeAccountId && accounts.length) cfg.activeAccountId = accounts[0].id;
-        const account = accounts.find(a => a.id === cfg.activeAccountId);
+        const personal = accounts.filter(a => a.type === 'oauth');
+        const candidates = personal.length ? personal : accounts;
+        if (!cfg.activeAccountId && candidates.length) cfg.activeAccountId = candidates[0].id;
+        let account = candidates.find(a => a.id === cfg.activeAccountId);
+        if (!account && candidates.length) {
+          account = candidates[0];
+          cfg.activeAccountId = account.id;
+          await window.SIGR.BackupService.saveConfig(cfg).catch(() => {});
+        }
         if (!account) return;
 
         let queueSize = 0;

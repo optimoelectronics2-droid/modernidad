@@ -369,8 +369,13 @@
         if (json.error === 'authorization_pending') { continue; }
         if (json.error === 'slow_down') { flow.interval += 5; continue; }
         if (json.error === 'access_denied') throw new Error('Acceso denegado por el usuario');
-        if (json.error === 'expired_token') throw new Error('El código expiró. Inténtalo de nuevo');
-        if (json.error === 'invalid_grant' || status === 400) throw new Error('Código inválido. Inténtalo de nuevo');
+        if (json.error === 'expired_token') throw new Error('El código expiró. Pulsa de nuevo "Iniciar sesión con Google"');
+        if (json.error === 'invalid_grant' || status === 400) {
+          if (json.error_description && /already|used|expired/i.test(json.error_description)) {
+            throw new Error('La autorización ya se procesó o el código expiró. Comprueba si tu cuenta ya aparece en la lista.');
+          }
+          throw new Error('Código inválido: asegúrate de escribir el código exacto que muestra la app');
+        }
         throw new Error(json.error_description || json.error || 'Error de autenticación');
       }
       throw new Error('Se agotó el tiempo de espera');
