@@ -83,7 +83,7 @@
 
           <div class="settings-section-title">👤 Cuentas de Google</div>
           ${accountRows}
-          <button class="btn btn-primary" data-action="bsConnectPersonal" style="--mc:#5CA8FF;margin-top:8px">＋ Conectar cuenta personal (Google)</button>
+          <button class="btn btn-primary" data-action="bsConnectPersonal" style="--mc:#5CA8FF;margin-top:8px">＋ Iniciar sesión con Google</button>
           <button class="btn btn-ghost" data-action="bsAddAccount" style="margin-top:8px">＋ Conectar cuenta de servicio (avanzado)</button>
 
           ${saEmail ? `<div class="settings-card" style="flex-direction:column;align-items:flex-start;gap:6px;margin-top:8px">
@@ -171,44 +171,20 @@
           break;
 
         case 'bsConnectPersonal': {
-          const savedCid = await window.SIGR.StorageService.getSetting('oauth_client_id', '').catch(() => '');
-          const body = `<div class="empty" style="padding:12px">
-            <div class="eicon">👤</div>
-            <div class="etext" style="font-size:12px">
-              Para usar tu cuenta de Google, la app necesita un <strong>Client ID</strong> (se crea UNA sola vez y se guarda).<br><br>
-              <strong>1.</strong> Abre <a href="https://console.cloud.google.com/apis/credentials" target="_blank">console.cloud.google.com/apis/credentials</a> en el navegador.<br>
-              <strong>2.</strong> Pulsa <strong>+ Crear credenciales → ID de cliente de OAuth</strong>.<br>
-              <strong>3.</strong> Tipo de aplicación: <strong>TV y dispositivos con entrada limitada</strong>.<br>
-              <strong>4.</strong> Copia el <strong>Client ID</strong> (termina en .apps.googleusercontent.com) y pégalo aquí.<br><br>
-              Después de esto, al pulsar "Comenzar" verás el <strong>selector de cuentas de Google</strong> en google.com/device: eliges tu cuenta, le das permisos y listo.
-            </div>
-          </div>
-          <div class="field">
-            <label>Client ID de OAuth</label>
-            <input type="text" id="bsOauthClientId" value="${esc(savedCid)}" placeholder="xxxxx.apps.googleusercontent.com" style="font-size:12px">
-          </div>`;
-          const footer = `<button class="btn" data-action="closeModal">Cancelar</button>
-            <button class="btn btn-primary" data-action="bsStartDeviceFlow" style="--mc:#5CA8FF">Comenzar</button>`;
-          window.openModal({ title: 'Conectar cuenta personal de Google', body, footer });
-          break;
-        }
-
-        case 'bsStartDeviceFlow': {
-          const clientId = (document.getElementById('bsOauthClientId')?.value || '').trim();
           const btn = el;
           btn.disabled = true;
           try {
-            await window.SIGR.StorageService.setSetting('oauth_client_id', clientId).catch(() => {});
-            const flow = await GA.startDeviceFlow(clientId);
+            const flow = await GA.startDeviceFlow();
             this._state.flow = flow;
             const body = `<div style="text-align:center;padding:12px 0">
-              <div style="font-size:13px;color:var(--text-dim);margin-bottom:10px">Abre este enlace en cualquier dispositivo y escribe el código:</div>
-              <div style="font-size:16px;font-weight:800;color:var(--c-personal,#9C8CFF);margin-bottom:10px;word-break:break-all"><a href="${esc(flow.verificationUrl)}" target="_blank">${esc(flow.verificationUrl)}</a></div>
+              <div style="font-size:13px;color:var(--text-dim);margin-bottom:10px">Abre este enlace (en el navegador o en el móvil), elige tu cuenta de Google y acepta los permisos:</div>
+              <div style="font-size:15px;font-weight:800;color:var(--c-personal,#9C8CFF);margin-bottom:10px;word-break:break-all"><a href="${esc(flow.verificationUrl)}" target="_blank">${esc(flow.verificationUrl)}</a></div>
               <div style="font-size:34px;font-weight:800;letter-spacing:8px;color:#12D68A;margin-bottom:10px">${esc(flow.userCode)}</div>
               <button class="btn btn-ghost" data-action="bsCopyUserCode" style="font-size:12px;margin-bottom:12px">📋 Copiar código</button>
               <div id="bsDeviceStatus" style="font-size:12px;color:var(--text-faint)">Esperando autorización…</div>
+              <div style="font-size:11px;color:var(--text-faint);margin-top:12px">Si ves "Acceso bloqueado": consola de Google → Pantalla de consentimiento → Usuarios de prueba → añade tu correo y vuelve a intentarlo.</div>
             </div>`;
-            window.openModal({ title: 'Autoriza la app', body, closeOnOverlay: false });
+            window.openModal({ title: 'Iniciar sesión con Google', body, closeOnOverlay: false });
             this._pollDevice(flow);
           } catch(e) {
             showToast(e.message || 'No se pudo iniciar el flujo');

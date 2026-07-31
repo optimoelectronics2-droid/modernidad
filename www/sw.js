@@ -1,4 +1,4 @@
-const CACHE = 'sigr-cache-v4';
+const CACHE = 'sigr-cache-v5';
 const ASSETS = [
   '/index.html',
   '/manifest.json',
@@ -70,7 +70,9 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request).catch(() => caches.match(e.request))
+    fetch(e.request).catch(() =>
+      caches.match(e.request).then(m => m || caches.match(url.pathname))
+    )
   );
 });
 

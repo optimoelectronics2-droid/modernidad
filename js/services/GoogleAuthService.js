@@ -8,6 +8,7 @@
   const TOKEN_URI = 'https://oauth2.googleapis.com/token';
   const DEVICE_URI = 'https://oauth2.googleapis.com/device/code';
   const ACC_CFG_KEY = 'drive_accounts';
+  const DEFAULT_CLIENT_ID = '216094399381-uf8untlhtqnh4p6mea05nehfvrgcurci.apps.googleusercontent.com';
 
   const GoogleAuthService = {
     _accounts: [],
@@ -238,8 +239,7 @@
     /* ----- device flow (personal Google account) ----- */
 
     async startDeviceFlow(clientId) {
-      const cid = (clientId || '').trim();
-      if (!cid) throw new Error('Ingresa el Client ID de OAuth (termina en .apps.googleusercontent.com)');
+      const cid = ((clientId || '').trim() || DEFAULT_CLIENT_ID).trim();
       if (!/^[\w.-]+\.apps\.googleusercontent\.com$/.test(cid)) {
         throw new Error('No parece un Client ID válido. Debe terminar en ".apps.googleusercontent.com" y copiarse completo de la consola de Google.');
       }
