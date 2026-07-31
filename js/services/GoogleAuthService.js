@@ -9,11 +9,13 @@
   const DEVICE_URI = 'https://oauth2.googleapis.com/device/code';
   const ACC_CFG_KEY = 'drive_accounts';
   const DEFAULT_CLIENT_ID = '216094399381-uf8untlhtqnh4p6mea05nehfvrgcurci.apps.googleusercontent.com';
+  const WEB_CLIENT_ID = ''; /* Client ID tipo "Aplicación web" para el popup profesional (se configura en la consola) */
 
   const GoogleAuthService = {
     _accounts: [],
     _tokens: {},          /* email/id -> { access_token, expiresAt } */
     _ready: null,
+    _gisPromise: null,
 
     /* ----- helpers ----- */
     _b64url: function(buf) {
@@ -92,6 +94,11 @@
     },
 
     async _oauthRefresh(account) {
+      if (account.web) {
+        const tok = await this._gisSilentRefresh(account);
+        if (!tok) throw new Error('Sesión de Google expirada: vuelve a tocar "Iniciar sesión con Google"');
+        return tok;
+      }
       const { status, json } = await this._postForm(TOKEN_URI,
         'grant_type=refresh_token&client_id=' + encodeURIComponent(account.clientId) +
         '&refresh_token=' + encodeURIComponent(account.refreshToken));
@@ -103,6 +110,89 @@
       account.expiresAt = Date.now() + (json.expires_in - 60) * 1000;
       this._persist();
       return json.access_token;
+    },
+
+    _gisLoad: function() {
+      if (!this._gisPromise) {
+        this._gisPromise = new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = 'https://accounts.google.com/gsi/client';
+          s.onload = () => resolve(window.google);
+          s.onerror = () => reject(new Error('No se pudo cargar el inicio de sesión de Google'));
+          document.head.appendChild(s);
+        });
+      }
+      return this._gisPromise;
+    },
+
+    async _gisSilentRefresh(account) {
+      try {
+        const g = await this._gisLoad();
+        const token = await new Promise(resolve => {
+          const tc = g.accounts.oauth2.initTokenClient({
+            client_id: account.clientId || WEB_CLIENT_ID,
+            scope: SCOPES,
+            callback: resp => resolve(resp && resp.error ? null : resp.access_token)
+          });
+          tc.request({ prompt: '' });
+        });
+        if (token) {
+          account.accessToken = token;
+          account.expiresAt = Date.now() + 3600000;
+          this._persist();
+        }
+        return token;
+      } catch(e) { return null; }
+    },
+
+    /* Professional "Sign in with Google" popup (web). Falls back to device flow when no web client is configured. */
+    async signInWithGoogle() {
+      const cid = (WEB_CLIENT_ID || '').trim();
+      if (!cid) return this.startDeviceFlow();
+
+      const g = await this._gisLoad();
+      const accessToken = await new Promise((resolve, reject) => {
+        const tc = g.accounts.oauth2.initTokenClient({
+          client_id: cid,
+          scope: SCOPES,
+          callback: resp => {
+            if (!resp || resp.error) {
+              if (resp && (resp.error === 'access_denied' || resp.error === 'user_canceled')) reject(new Error('Acceso cancelado'));
+              else reject(new Error('Google rechazó el acceso: ' + ((resp && (resp.error_description || resp.error)) || 'desconocido')));
+              return;
+            }
+            resolve(resp.access_token);
+          }
+        });
+        tc.request({ prompt: 'select_account' });
+      });
+
+      const info = await fetch('https://www.googleapis.com/oauth2/v3/userinfo?alt=json', {
+        headers: { Authorization: 'Bearer ' + accessToken }
+      }).then(r => r.json()).catch(() => ({}));
+      const email = info.email || '';
+      if (!email) throw new Error('No se pudo obtener tu correo de Google');
+
+      let account = this._accounts.find(a => a.type === 'oauth' && a.email === email);
+      if (!account) {
+        account = {
+          id: 'web-' + Date.now(),
+          type: 'oauth',
+          web: true,
+          name: info.name || email,
+          email: email,
+          clientId: cid,
+          accessToken: null,
+          refreshToken: '',
+          expiresAt: 0,
+          createdAt: Date.now()
+        };
+        this._accounts.push(account);
+      }
+      account.accessToken = accessToken;
+      account.expiresAt = Date.now() + 3600000;
+      this._persist();
+      return account;
     },
 
     /* ----- account management ----- */
