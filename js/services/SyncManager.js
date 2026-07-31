@@ -18,6 +18,7 @@
     },
     _lastErrorAt: 0,
     _lastSuccessAt: 0,
+    _failureCount: 0,
 
     init: async function() {
       window.addEventListener('online', () => {
@@ -115,6 +116,7 @@
         await window.SIGR.StorageService.clearSyncQueue().catch(() => {});
 
         this._lastSuccessAt = Date.now();
+        this._failureCount = 0;
         cfg.lastError = null;
         await window.SIGR.BackupService.saveConfig(cfg);
         this._setStatus({
@@ -136,14 +138,18 @@
         this._schedule(next);
       } catch(e) {
         this._lastErrorAt = Date.now();
+        this._failureCount++;
         const isPassphrase = /contraseña de cifrado/i.test((e && e.message) || '');
+        const isConfig = /comparte una carpeta|Client ID|cuota/i.test((e && e.message) || '');
         this._setStatus({
           state: isPassphrase ? 'passphrase-required' : 'error',
           message: isPassphrase ? 'Copias cifradas activas: ingresa tu contraseña de cifrado para poder subir' : 'Error de sincronización: ' + (e && e.message || 'desconocido'),
           lastSync: Date.now()
         });
-        /* retry with backoff: 1min, 2min, 4min... max 30min; if passphrase missing, wait the normal interval instead */
-        const retryDelay = isPassphrase ? await this._syncIntervalMs() : Math.min(1800000, 60000 * Math.pow(2, Math.floor((Date.now() - this._lastErrorAt) / 60000)));
+        /* retry with backoff: 1min, 2min, 4min... max 30min; after 3 consecutive failures (or
+           config/passphrase errors) wait the normal interval instead of hammering the API */
+        const backoff = Math.min(1800000, 60000 * Math.pow(2, Math.floor((Date.now() - this._lastErrorAt) / 60000)));
+        const retryDelay = (isPassphrase || isConfig || this._failureCount >= 3) ? await this._syncIntervalMs() : backoff;
         if (this._timer) clearTimeout(this._timer);
         this._timer = setTimeout(() => this.process(), retryDelay);
       } finally {
@@ -160,6 +166,7 @@
       const result = await window.SIGR.BackupService.createBackup(accountId);
       await window.SIGR.StorageService.clearSyncQueue().catch(() => {});
       this._lastSuccessAt = Date.now();
+      this._failureCount = 0;
       this._setStatus({ state: 'idle', message: 'Copia creada: ' + result.name, lastResult: result, lastSync: Date.now() });
       return result;
     }

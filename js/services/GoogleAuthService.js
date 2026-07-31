@@ -238,10 +238,17 @@
     /* ----- device flow (personal Google account) ----- */
 
     async startDeviceFlow(clientId) {
-      if (!clientId || !clientId.trim()) throw new Error('Ingresa el Client ID de OAuth');
+      const cid = (clientId || '').trim();
+      if (!cid) throw new Error('Ingresa el Client ID de OAuth (termina en .apps.googleusercontent.com)');
+      if (!/^[\w.-]+\.apps\.googleusercontent\.com$/.test(cid)) {
+        throw new Error('No parece un Client ID válido. Debe terminar en ".apps.googleusercontent.com" y copiarse completo de la consola de Google.');
+      }
       const { status, json } = await this._postForm(DEVICE_URI,
-        'client_id=' + encodeURIComponent(clientId.trim()) + '&scope=' + encodeURIComponent(SCOPES));
+        'client_id=' + encodeURIComponent(cid) + '&scope=' + encodeURIComponent(SCOPES));
       if (status !== 200 || !json.device_code) {
+        if (status === 401 || json.error === 'invalid_client') {
+          throw new Error('Google rechazó el Client ID (401). Verifica que está copiado completo, sin espacios, y que el cliente OAuth es tipo "TV y dispositivos con entrada limitada" en la consola.');
+        }
         throw new Error('No se pudo iniciar: ' + (json.error_description || json.error || status) + '. Crea un cliente tipo "TV y dispositivos con entrada limitada" y usa su Client ID.');
       }
       return {
@@ -250,7 +257,7 @@
         verificationUrl: json.verification_url,
         expiresIn: json.expires_in,
         interval: Math.max(5, json.interval || 5),
-        clientId: clientId.trim()
+        clientId: cid
       };
     },
 

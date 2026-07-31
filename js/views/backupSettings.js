@@ -171,18 +171,21 @@
           break;
 
         case 'bsConnectPersonal': {
+          const savedCid = await window.SIGR.StorageService.getSetting('oauth_client_id', '').catch(() => '');
           const body = `<div class="empty" style="padding:12px">
             <div class="eicon">👤</div>
             <div class="etext" style="font-size:12px">
-              1. Crea un cliente OAuth en <strong>console.cloud.google.com</strong> → APIs y servicios → Credenciales → <strong>Crear credenciales → ID de cliente de OAuth</strong>.<br>
-              2. Tipo de aplicación: <strong>TV y dispositivos con entrada limitada</strong>.<br>
-              3. Copia el <strong>Client ID</strong> (termina en .apps.googleusercontent.com) y pégalo aquí.<br>
-              4. En la app aparecerá un código: introdúcelo en <strong>google.com/device</strong> con la cuenta que quieras usar.
+              Para usar tu cuenta de Google, la app necesita un <strong>Client ID</strong> (se crea UNA sola vez y se guarda).<br><br>
+              <strong>1.</strong> Abre <a href="https://console.cloud.google.com/apis/credentials" target="_blank">console.cloud.google.com/apis/credentials</a> en el navegador.<br>
+              <strong>2.</strong> Pulsa <strong>+ Crear credenciales → ID de cliente de OAuth</strong>.<br>
+              <strong>3.</strong> Tipo de aplicación: <strong>TV y dispositivos con entrada limitada</strong>.<br>
+              <strong>4.</strong> Copia el <strong>Client ID</strong> (termina en .apps.googleusercontent.com) y pégalo aquí.<br><br>
+              Después de esto, al pulsar "Comenzar" verás el <strong>selector de cuentas de Google</strong> en google.com/device: eliges tu cuenta, le das permisos y listo.
             </div>
           </div>
           <div class="field">
             <label>Client ID de OAuth</label>
-            <input type="text" id="bsOauthClientId" placeholder="xxxxx.apps.googleusercontent.com" style="font-size:12px">
+            <input type="text" id="bsOauthClientId" value="${esc(savedCid)}" placeholder="xxxxx.apps.googleusercontent.com" style="font-size:12px">
           </div>`;
           const footer = `<button class="btn" data-action="closeModal">Cancelar</button>
             <button class="btn btn-primary" data-action="bsStartDeviceFlow" style="--mc:#5CA8FF">Comenzar</button>`;
@@ -195,6 +198,7 @@
           const btn = el;
           btn.disabled = true;
           try {
+            await window.SIGR.StorageService.setSetting('oauth_client_id', clientId).catch(() => {});
             const flow = await GA.startDeviceFlow(clientId);
             this._state.flow = flow;
             const body = `<div style="text-align:center;padding:12px 0">
@@ -476,9 +480,20 @@
         const account = await GA.finishOAuthAccount(flow, tokenResult);
         const status = document.getElementById('bsDeviceStatus');
         if (status) status.innerHTML = '<span style="color:#12D68A">✅ Autorizado correctamente</span>';
-        setTimeout(() => {
+        setTimeout(async () => {
           closeModal();
-          showToast('Cuenta conectada: ' + (account.email || 'Google') + ' ✓');
+          try {
+            const cfg = await BS.getConfig();
+            const active = GA.getAccounts().find(a => a.id === cfg.activeAccountId);
+            const activeSaNoFolder = active && active.type === 'sa' && !(cfg.folders || {})[active.id];
+            if (!cfg.activeAccountId || activeSaNoFolder) {
+              cfg.activeAccountId = account.id;
+              await BS.saveConfig(cfg);
+              showToast('Cuenta conectada y activada: ' + (account.email || 'Google') + ' ✓');
+            } else {
+              showToast('Cuenta conectada: ' + (account.email || 'Google') + ' ✓');
+            }
+          } catch(e) { showToast('Cuenta conectada: ' + (account.email || 'Google') + ' ✓'); }
           this.refresh();
         }, 700);
       } catch(e) {
