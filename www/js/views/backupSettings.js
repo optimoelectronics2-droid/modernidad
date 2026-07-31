@@ -463,6 +463,8 @@
     },
 
     _pollDevice: async function(flow) {
+      const GA = window.SIGR.GoogleAuthService;
+      const BS = window.SIGR.BackupService;
       try {
         const tokenResult = await GA.pollDeviceFlow(flow, () => {});
         const account = await GA.finishOAuthAccount(flow, tokenResult);
