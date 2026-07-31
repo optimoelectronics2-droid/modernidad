@@ -1,0 +1,32 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Credenciales de Google (service account) — nunca subir a un repositorio
+/secure/service-account.json
+/www/secure/service-account.json
+*.service-account.json
+
+# Dependencias y artefactos de build
+node_modules/
+**/build/
+**/.kotlin/
+*.apk
+*.aab
+*.keystore
+*.jks
+*.p12
+.capacitor/
+.DS_Store

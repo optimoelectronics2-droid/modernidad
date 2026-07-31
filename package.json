@@ -1,0 +1,21 @@
+{
+  "name": "sigr-pro",
+  "version": "1.0.0",
+  "description": "Sistema Inteligente de Gestión de Registros - App Android con Capacitor",
+  "private": true,
+  "scripts": {
+    "build": "echo 'Static PWA – no build step required'",
+    "www:sync": "powershell -Command \"Copy-Item -Path 'index.html','manifest.json','sw.js' -Destination 'www' -Force; Copy-Item -Recurse -Path 'css','icons','js' -Destination 'www' -Force\"",
+    "cap:copy": "npm run www:sync && npx cap copy",
+    "cap:sync": "npm run www:sync && npx cap sync",
+    "cap:open:android": "npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.0",
+    "@capacitor/core": "^6.1.0",
+    "@capacitor/local-notifications": "^6.1.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.0"
+  }
+}

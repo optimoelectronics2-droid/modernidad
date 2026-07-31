@@ -1,0 +1,60 @@
+{
+  "name": "Sistema Inteligente de Gestión de Registros",
+  "short_name": "SIGR Pro",
+  "description": "Sistema profesional de gestión de registros, expedientes, pagos, pendientes y más.",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A0C12",
+  "theme_color": "#0A0C12",
+  "categories": ["business", "productivity", "utilities"],
+  "lang": "es-DO",
+  "scope": "/",
+  "id": "/",
+  "icons": [
+    { "src": "icons/icon-72.png", "sizes": "72x72", "type": "image/png" },
+    { "src": "icons/icon-96.png", "sizes": "96x96", "type": "image/png" },
+    { "src": "icons/icon-128.png", "sizes": "128x128", "type": "image/png" },
+    { "src": "icons/icon-144.png", "sizes": "144x144", "type": "image/png" },
+    { "src": "icons/icon-152.png", "sizes": "152x152", "type": "image/png" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-384.png", "sizes": "384x384", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "screenshots": [
+    {
+      "src": "icons/screenshot-dashboard.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Panel principal con módulos y estadísticas"
+    },
+    {
+      "src": "icons/screenshot-record.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Expediente inteligente con movimientos y timeline"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nuevo registro rápido",
+      "short_name": "Nuevo",
+      "description": "Crear un registro en el último módulo usado",
+      "url": "/index.html?action=new"
+    },
+    {
+      "name": "Recordatorios",
+      "short_name": "Recordatorios",
+      "description": "Ver recordatorios activos",
+      "url": "/index.html?view=reminders"
+    },
+    {
+      "name": "Centro de actividad",
+      "short_name": "Actividad",
+      "description": "Ver toda la actividad del sistema",
+      "url": "/index.html?view=activity"
+    }
+  ]
+}

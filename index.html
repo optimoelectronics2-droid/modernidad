@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0A0C12">
+<meta name="description" content="Sistema Inteligente de Gestión de Registros - Gestión personal y empresarial">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%239C8CFF'/><text x='16' y='22' font-size='18' font-weight='800' text-anchor='middle' fill='%230A0C12' font-family='sans-serif'>S</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css?v=3">
+<title>SIGR Pro - Gestión Inteligente</title>
+<style>
+  /* Critical inline styles for first paint */
+  body{background:#0A0C12;color:#EEF0F6;font-family:'Manrope',sans-serif;margin:0;padding:0;}
+  #app{max-width:560px;margin:0 auto;min-height:100vh;padding-bottom:env(safe-area-inset-bottom,0px);}
+  .loading-screen{padding:80px 20px;text-align:center;color:#565D72;}
+  .loading-screen .ls-icon{font-size:48px;margin-bottom:16px;}
+  .loading-screen .ls-text{font-size:15px;font-weight:600;}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading-screen"><div class="ls-icon">⚡</div><div class="ls-text">Cargando SIGR Pro...</div></div></div>
+<div id="toast"></div>
+<div id="modal"></div>
+<div id="sidebarOverlay" onclick="window.closeSidebar()"></div>
+<div id="sidebar"><div class="sidebar-inner"><div class="sidebar-header"><div class="sidebar-brand">⚡ SIGR Pro</div><button class="sidebar-close" onclick="window.closeSidebar()">✖</button></div><div class="sidebar-nav" id="sidebarNav"></div></div></div>
+<div id="notificationFallback"></div>
+
+<script>window.addEventListener('unhandledrejection',function(e){console.warn('Unhandled:',e.reason);});</script>
+<script>caches&&caches.keys().then(k=>Promise.all(k.map(c=>caches.delete(c)))).catch(e=>{});</script>
+<script src="js/core/storage.js?v=3"></script>
+<script src="js/core/state.js?v=3"></script>
+<script src="js/services/ActivityService.js?v=3"></script>
+<script src="js/services/AuditService.js?v=3"></script>
+<script src="js/services/NotificationService.js?v=3"></script>
+<script src="js/services/ReminderService.js?v=3"></script>
+<script src="js/services/EmailService.js?v=3"></script>
+<script src="js/services/SchedulerService.js?v=3"></script>
+<script src="js/services/SyncService.js?v=3"></script>
+<script src="js/services/FinanceService.js?v=3"></script>
+<script src="js/services/AgendaService.js?v=3"></script>
+<script src="js/services/VaultService.js?v=3"></script>
+<script src="js/services/GoogleAuthService.js?v=3"></script>
+<script src="js/services/DriveService.js?v=3"></script>
+<script src="js/services/BackupService.js?v=3"></script>
+<script src="js/services/SyncManager.js?v=3"></script>
+<script src="js/components/timeline.js?v=3"></script>
+<script src="js/components/sidePanel.js?v=3"></script>
+<script src="js/components/movementForm.js?v=3"></script>
+<script src="js/components/reminderForm.js?v=3"></script>
+<script src="js/views/dashboard.js?v=3"></script>
+<script src="js/views/list.js?v=3"></script>
+<script src="js/views/detail.js?v=3"></script>
+<script src="js/views/form.js?v=3"></script>
+<script src="js/views/stats.js?v=3"></script>
+<script src="js/views/activity.js?v=3"></script>
+<script src="js/views/reminders.js?v=3"></script>
+<script src="js/views/calendar.js?v=3"></script>
+<script src="js/views/notifications.js?v=3"></script>
+<script src="js/views/settings.js?v=3"></script>
+<script src="js/views/finance.js?v=3"></script>
+<script src="js/views/agendaView.js?v=3"></script>
+<script src="js/views/vaultView.js?v=3"></script>
+<script src="js/views/backupSettings.js?v=3"></script>
+<script src="js/app.js?v=3"></script>
+
+<script>
+/* Minimal bootstrap to handle legacy window.storage API */
+if (typeof window.storage === 'undefined') {
+  window.storage = {
+    _data: {},
+    get: function(key, cb) {
+      try {
+        const val = localStorage.getItem('sigr:' + key);
+        return cb !== false ? { value: val } : Promise.resolve({ value: val });
+      } catch(e) { return cb !== false ? { value: null } : Promise.resolve({ value: null }); }
+    },
+    set: function(key, val, cb) {
+      try { localStorage.setItem('sigr:' + key, val); } catch(e) {}
+      if (cb !== false) return;
+      return Promise.resolve();
+    }
+  };
+}
+</script>
+</body>
+</html>
