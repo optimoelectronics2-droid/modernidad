@@ -33,11 +33,11 @@
       const fmtSize = b => b ? (b.size > 1048576 ? (b.size/1048576).toFixed(1)+' MB' : Math.max(1, Math.round(b.size/1024))+' KB') : '';
       const fmtDate = ts => ts ? new Date(ts).toLocaleString('es-ES') : '—';
 
-      const accountRows = accounts.map(a => `
+      const accountRows = accounts.filter(a => a.type === 'oauth').map(a => `
         <div class="settings-card" data-action="bsSetActive" data-account="${a.id}" style="cursor:pointer">
-          <div class="si">${a.id === (cfg.activeAccountId || activeAccount && activeAccount.id) ? '✅' : (a.type === 'oauth' ? '👤' : '📎')}</div>
+          <div class="si">${a.id === (cfg.activeAccountId || activeAccount && activeAccount.id) ? '✅' : '👤'}</div>
           <div class="st" style="flex:1">
-            <div>${esc(a.name || 'Cuenta')} <span class="tag" style="font-size:10px">${a.type === 'oauth' ? 'personal' : 'servicio'}</span></div>
+            <div>${esc(a.name || 'Cuenta')}</div>
             <div style="font-size:11px;color:var(--text-faint)">${esc(a.email || a.id)}</div>
           </div>
           <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px" data-action="bsTestAccount" data-account="${a.id}">Probar</button>
@@ -54,9 +54,6 @@
           <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px" data-action="bsRestore" data-file="${b.id}" data-name="${esc(b.name)}" data-enc="${b.encrypted?'1':'0'}">Restaurar</button>
           <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px" data-action="bsDeleteBackup" data-file="${b.id}">🗑</button>
         </div>`).join('') || '<div style="padding:12px;color:var(--text-faint);font-size:12px;text-align:center">No hay copias en Drive todavía' + (backupsErr ? ' (' + esc(backupsErr) + ')' : '') + '</div>';
-
-      const sharedFolder = (cfg.folders || {})[cfg.activeAccountId || (activeAccount && activeAccount.id)] || null;
-      const saEmail = activeAccount ? activeAccount.email : '';
 
       return `<div class="view">
         ${topbar('Copia de seguridad y sincronización', null)}
@@ -84,28 +81,6 @@
           <div class="settings-section-title">👤 Cuentas de Google</div>
           ${accountRows}
           <button class="btn btn-primary" data-action="bsConnectPersonal" style="--mc:#5CA8FF;margin-top:8px">＋ Iniciar sesión con Google</button>
-          <button class="btn btn-ghost" data-action="bsAddAccount" style="margin-top:8px">＋ Conectar cuenta de servicio (avanzado)</button>
-
-          ${saEmail ? `<div class="settings-card" style="flex-direction:column;align-items:flex-start;gap:6px;margin-top:8px">
-            <div class="st" style="font-size:13px">📁 Carpeta de Drive</div>
-            <div style="font-size:12px;color:var(--text-faint)">
-              Carpeta: <strong>${esc((sharedFolder && sharedFolder.folderName) || 'SIGR Pro Backups (propia del servicio)')}</strong>
-            </div>
-            ${sharedFolder ? `<button class="btn btn-ghost" style="font-size:12px;padding:6px 10px;margin-top:4px" data-action="bsOpenFolderLink" data-id="${sharedFolder.folderId}">Abrir carpeta en Drive</button>` : ''}
-            <div style="font-size:12px;color:var(--text-faint);margin-top:4px">
-              Para usar tu carpeta personal: crea una carpeta en drive.google.com y compártela como <strong>Editor</strong> con la cuenta de servicio:
-            </div>
-            <code style="color:var(--c-personal,#9C8CFF);font-size:12px;word-break:break-all" id="bsSaEmail">${esc(saEmail)}</code>
-            <div class="detail-actions" style="padding:0">
-              <button class="dact" data-action="bsCopySaEmail"><span class="di">📋</span>Copiar correo</button>
-              <button class="dact" data-action="bsPickSharedFolder"><span class="di">📁</span>Elegir carpeta compartida…</button>
-            </div>
-            <div class="field" style="width:100%">
-              <label>O pega el enlace/ID de la carpeta</label>
-              <input type="text" id="bsSharedFolderLink" placeholder="https://drive.google.com/drive/folders/1AbC…">
-            </div>
-            <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" data-action="bsSaveSharedFolderLink">Guardar carpeta</button>
-          </div>` : ''}
 
           <div class="settings-section-title">⚙ Automático</div>
           <div class="field">
@@ -163,13 +138,8 @@
       const BS = window.SIGR.BackupService;
       const GA = window.SIGR.GoogleAuthService;
       const SM = window.SIGR.SyncManager;
-      const DriveSvc = window.SIGR.DriveService;
 
       switch(action) {
-        case 'bsAddAccount':
-          this._openAddAccountModal();
-          break;
-
         case 'bsConnectPersonal': {
           const btn = el;
           btn.disabled = true;
@@ -209,68 +179,6 @@
           const flow = this._state.flow;
           if (!flow) return;
           try { await navigator.clipboard.writeText(flow.userCode); showToast('Código copiado'); } catch(e) { showToast('Copia manualmente: ' + flow.userCode); }
-          break;
-        }
-
-        case 'bsCopySaEmail': {
-          const email = document.getElementById('bsSaEmail')?.textContent || '';
-          try { await navigator.clipboard.writeText(email); showToast('Correo copiado'); } catch(e) { showToast('Copia manualmente: ' + email); }
-          break;
-        }
-
-        case 'bsSaveSharedFolderLink': {
-          const raw = (document.getElementById('bsSharedFolderLink')?.value || '').trim();
-          if (!raw) { showToast('Pega el enlace o ID de la carpeta'); return; }
-          const m = raw.match(/folders\/([\w-]{10,})/) || raw.match(/^([\w-]{10,})$/);
-          const folderId = m ? m[1] : raw;
-          if (!folderId || folderId.length < 10) { showToast('No parece un enlace o ID válido'); return; }
-          showToast('Verificando carpeta…');
-          try {
-            const cfg = await BS.getConfig();
-            const f = await DriveSvc.getFile(cfg.activeAccountId, folderId);
-            if (!f || !f.id) throw new Error('Carpeta no accesible. Compártela con la cuenta de servicio como Editor.');
-            await BS.setSharedFolder(cfg.activeAccountId, folderId, f.name);
-            showToast('Carpeta configurada: ' + f.name);
-            this.refresh();
-          } catch(e) {
-            showToast(e.message || 'No se pudo verificar la carpeta');
-          }
-          break;
-        }
-
-        case 'bsSaveAccountJson': {
-          const raw = (document.getElementById('bsAccountJson')?.value || '').trim();
-          if (!raw) { showToast('Pega el contenido del JSON de la cuenta'); return; }
-          const btn = el;
-          btn.disabled = true; btn.textContent = 'Conectando…';
-          try {
-            await GA.addServiceAccount(raw);
-            showToast('Cuenta conectada correctamente ✅');
-            const cfg = await BS.getConfig();
-            if (!cfg.activeAccountId) {
-              cfg.activeAccountId = GA.getAccounts()[0].id;
-              await BS.saveConfig(cfg);
-            }
-            closeModal();
-            this.refresh();
-          } catch(e) {
-            showToast(e.message || 'No se pudo conectar la cuenta');
-            btn.disabled = false; btn.textContent = 'Conectar cuenta';
-          }
-          break;
-        }
-
-        case 'bsAddAccountFile':
-          document.getElementById('bsAccountFile')?.click();
-          break;
-
-        case 'bsAccountFileChosen': {
-          const file = document.getElementById('bsAccountFile')?.files[0];
-          if (!file) return;
-          const text = await file.text();
-          const ta = document.getElementById('bsAccountJson');
-          if (ta) ta.value = text;
-          try { JSON.parse(text); showToast('JSON cargado ✓'); } catch(e) { showToast('El archivo no es un JSON válido'); }
           break;
         }
 
@@ -418,30 +326,6 @@
           break;
         }
 
-        case 'bsOpenFolderLink': {
-          const id = el.dataset.id;
-          const url = 'https://drive.google.com/drive/folders/' + id;
-          const w = window.open(url, '_blank');
-          if (!w) showToast('Permite ventanas emergentes para abrir Drive');
-          break;
-        }
-
-        case 'bsPickSharedFolder': {
-          this._openFolderPicker();
-          break;
-        }
-
-        case 'bsSetFolder': {
-          const folderId = el.dataset.id;
-          const folderName = el.dataset.name;
-          const cfg = await BS.getConfig();
-          await BS.setSharedFolder(cfg.activeAccountId, folderId, folderName);
-          closeModal();
-          showToast('Carpeta configurada: ' + folderName);
-          this.refresh();
-          break;
-        }
-
         case 'bsConfirmPrompt':
           this._confirmPrompt();
           break;
@@ -458,8 +342,6 @@
       const self = this;
       const bsImportFile = document.getElementById('bsImportFile');
       if (bsImportFile) bsImportFile.onchange = () => self.handleAction({ dataset: { action: 'bsImportFileChosen' } });
-      const bsAccountFile = document.getElementById('bsAccountFile');
-      if (bsAccountFile) bsAccountFile.onchange = () => self.handleAction({ dataset: { action: 'bsAccountFileChosen' } });
     },
 
     _pollDevice: async function(flow) {
@@ -496,28 +378,6 @@
       }
     },
 
-    _openAddAccountModal: function() {
-      const body = `<div class="empty" style="padding:12px">
-        <div class="eicon">📎</div>
-        <div class="etext" style="font-size:12px">
-          <strong>Importante:</strong> las cuentas de servicio no tienen cuota propia en Drive. Después de conectar la cuenta, deberás <strong>compartir una carpeta</strong> de tu Google Drive con ella (Editor) y elegirla en la sección "Carpeta de Drive".<br><br>
-          1. Crea una cuenta de servicio en <strong>console.cloud.google.com</strong> → APIs y servicios → Credenciales → <strong>Crear credenciales → Cuenta de servicio</strong>.<br>
-          2. Activa la API de <strong>Google Drive</strong> en tu proyecto.<br>
-          3. Descarga su <strong>clave JSON</strong>.<br>
-          4. Pega aquí el contenido del archivo o súbelo.
-        </div>
-      </div>
-      <div class="field">
-        <label>Clave JSON de la cuenta de servicio</label>
-        <textarea id="bsAccountJson" rows="7" placeholder='{ "type": "service_account", ... }' style="font-size:11px;font-family:monospace"></textarea>
-      </div>
-      <input type="file" id="bsAccountFile" accept=".json" style="display:none">`;
-      const footer = `<button class="btn" data-action="closeModal">Cancelar</button>
-        <button class="btn btn-primary" data-action="bsAddAccountFile" style="--mc:#5CA8FF">Cargar archivo…</button>
-        <button class="btn btn-primary" data-action="bsSaveAccountJson" style="--mc:#12D68A">Conectar cuenta</button>`;
-      window.openModal({ title: 'Conectar cuenta de servicio', body, footer, closeOnOverlay: true });
-    },
-
     _openRestoreModal: function(fileId, name, enc) {
       this._state.restoreFileId = fileId;
       this._state.mode = 'merge';
@@ -536,27 +396,6 @@
       const footer = `<button class="btn" data-action="closeModal">Cancelar</button>
         <button class="btn btn-primary" data-action="bsDoRestore" style="--mc:#12D68A">Restaurar ahora</button>`;
       window.openModal({ title: 'Restaurar copia', body, footer });
-    },
-
-    _openFolderPicker: async function() {
-      const cfg = await window.SIGR.BackupService.getConfig();
-      const accountId = cfg.activeAccountId;
-      if (!accountId) { showToast('Selecciona una cuenta primero'); return; }
-      let folders = [];
-      let err = '';
-      try {
-        const shared = await window.SIGR.DriveService.listFolders(accountId, null, true);
-        const own = await window.SIGR.DriveService.listFolders(accountId, null, false);
-        const seen = {};
-        folders = (shared.files || []).concat(own.files || []).filter(f => { if (seen[f.id]) return false; seen[f.id] = true; return true; });
-      } catch(e) { err = e.message || 'No se pudieron listar las carpetas'; }
-      const rows = folders.map(f => `<div class="settings-card" data-action="bsSetFolder" data-id="${f.id}" data-name="${esc(f.name)}">
-        <div class="si">📁</div><div class="st">${esc(f.name)}</div><div class="chev">›</div>
-      </div>`).join('') || '<div style="padding:12px;color:var(--text-faint);font-size:12px;text-align:center">' + (err ? 'Error: ' + esc(err) : 'Sin carpetas compartidas') + '</div>';
-      const body = `<div style="font-size:12px;color:var(--text-faint);margin-bottom:8px">
-        Las carpetas <strong>compartidas contigo</strong> aparecen aquí. Si no ves la tuya, compártela con la cuenta de servicio como Editor y vuelve a abrir esta lista.
-      </div>${rows}`;
-      window.openModal({ title: 'Elegir carpeta de Drive', body, closeOnOverlay: true });
     },
 
     _promptPassphrase: function() {
