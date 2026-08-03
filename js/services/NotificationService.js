@@ -117,6 +117,10 @@
       if (!this._supported) return 'denied';
       try {
         _permission = await Notification.requestPermission();
+        if (_permission === 'granted' && this._queued.length) {
+          const pending = this._queued.splice(0, this._queued.length);
+          pending.forEach(o => this.sendLocal(o).catch(() => {}));
+        }
         return _permission;
       } catch(e) {
         try {
@@ -128,7 +132,9 @@
     
     canNotify: function() {
       if (this._isNative) return true;
-      return this._supported && _permission === 'granted';
+      if (!this._supported) return false;
+      if ('Notification' in window) _permission = Notification.permission;
+      return _permission === 'granted';
     },
     
     sendLocal: async function(options) {
@@ -161,6 +167,7 @@
         }
       }
       
+      let shown = false;
       if (this.canNotify()) {
         try {
           const notifOptions = {
@@ -171,7 +178,10 @@
             data: data || {},
             vibrate: vibrate || [100, 50, 100],
             requireInteraction: requireInteraction !== false,
-            actions: actions || []
+            actions: (actions && actions.length) ? actions : [
+              { action: 'open', title: 'Abrir' },
+              { action: 'snooze', title: 'Posponer 10 min' }
+            ]
           };
           if (this._registration) {
             await this._registration.showNotification(title, notifOptions);
@@ -180,32 +190,88 @@
           }
           this._logSent(options);
           this._markReminderSent(options);
-          return true;
+          shown = true;
         } catch(e) {
           console.warn('NotificationService: send error', e);
-          this._fallback(options);
-          return false;
         }
-      } else {
-        this._fallback(options);
-        return false;
       }
+      
+      this._pushOverlay(options);
+      return shown;
     },
     
     _fallback: function(options) {
       this._queued.push(options);
       this._markSchedule(options.tag, 'failed');
-      this._tryShowFallback(options);
+      this._pushOverlay(options);
     },
     
-    _tryShowFallback: function(options) {
-      const container = document.getElementById('notificationFallback');
-      if (!container) return;
-      const n = document.createElement('div');
-      n.className = 'notif-fallback';
-      n.innerHTML = '<div class="notif-fb-icon">\uD83D\uDD14</div><div class="notif-fb-body"><div class="notif-fb-title">'+(options.title||'')+'</div>'+(options.body ? '<div class="notif-fb-text">'+options.body+'</div>' : '')+'</div><button class="notif-fb-close" data-action="dismissNotif">&times;</button>';
-      container.appendChild(n);
-      setTimeout(() => { if (n.parentNode) n.remove(); }, 5000);
+    _pushOverlay: function(options) {
+      try {
+        const container = document.getElementById('notificationFallback');
+        if (!container) return false;
+        while (container.childElementCount >= 3) container.removeChild(container.firstChild);
+        
+        const n = document.createElement('div');
+        n.className = 'notif-fallback';
+        const rid = (options.data && options.data.reminderId) || '';
+        const actionsHtml =
+          '<button class="notif-btn primary" data-action="notifOpen" data-rid="' + (rid || '') + '">Abrir</button>' +
+          (rid ? '<button class="notif-btn secondary" data-action="notifSnooze" data-rid="' + rid + '">Posponer 10 min</button>' : '');
+        n.innerHTML =
+          '<button class="notif-close" data-action="dismissNotif">&times;</button>' +
+          '<div class="notif-ic">\uD83D\uDD14</div>' +
+          '<div class="notif-body">' +
+            '<div class="notif-title">' + (options.title || '') + '</div>' +
+            (options.body ? '<div class="notif-text">' + options.body + '</div>' : '') +
+            '<div class="notif-time">ahora</div>' +
+            '<div class="notif-actions">' + actionsHtml + '</div>' +
+          '</div>' +
+          '<div class="notif-progress"></div>';
+        container.appendChild(n);
+        setTimeout(() => { n.classList.add('out'); setTimeout(() => n.remove(), 260); }, 8000);
+        this._playSound();
+        if (options.vibrate && navigator.vibrate) { try { navigator.vibrate(options.vibrate); } catch(e) {} }
+        return true;
+      } catch(e) {
+        return false;
+      }
+    },
+    
+    _playSound: function() {
+      try {
+        const doPlay = () => {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (!AC) return;
+          const ctx = new AC();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'sine'; osc.frequency.value = 880;
+          gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.28, ctx.currentTime + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.55);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.6);
+          osc.onended = () => { try { ctx.close(); } catch(e) {} };
+        };
+        window.SIGR.StorageService.getSetting('notification_config', null).then(cfg => {
+          if (cfg && cfg.sound === false) return;
+          if (cfg && cfg.silentStart && cfg.silentEnd) {
+            const now = new Date();
+            const hm = (now.getHours() < 10 ? '0' : '') + now.getHours() + ':' + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
+            if (cfg.silentStart < cfg.silentEnd) {
+              if (hm >= cfg.silentStart && hm < cfg.silentEnd) return;
+            } else if (hm >= cfg.silentStart || hm < cfg.silentEnd) return;
+          }
+          if (document.hidden) return;
+          doPlay();
+        }).catch(() => { if (!document.hidden) doPlay(); });
+      } catch(e) {}
+    },
+    
+    _playChime: function() {
+      /* fallback simple si WebAudio falla */
     },
     
     schedule: async function(options, date, frequency) {
@@ -318,9 +384,10 @@
     
     _scheduleInServiceWorker: function(options, date) {
       if (this._isNative) return;
-      if (!navigator.serviceWorker?.controller) return;
+      const sw = (this._registration && this._registration.active) || navigator.serviceWorker?.controller;
+      if (!sw) return;
       try {
-        navigator.serviceWorker.controller.postMessage({
+        sw.postMessage({
           type: 'SCHEDULE_NOTIFICATION',
           notification: {
             title: options.title,
@@ -333,6 +400,34 @@
           }
         });
       } catch(e) {}
+    },
+    
+    _onServiceReady: function(reg) {
+      this._registration = reg;
+      this._restoreSchedules();
+    },
+    
+    show: async function(title, body, data) {
+      return this.sendLocal({
+        title: title,
+        body: body || '',
+        tag: (data && data.tag) || 'sigr-notification',
+        data: data || {},
+        vibrate: [100, 50, 100]
+      });
+    },
+    
+    sendTest: async function() {
+      const now = new Date();
+      const hh = (now.getHours() < 10 ? '0' : '') + now.getHours();
+      const mm = (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
+      return this.sendLocal({
+        title: '\uD83D\uDD14 Notificaciones activadas',
+        body: 'Esto es una notificación real de BrayNotas · ' + hh + ':' + mm,
+        tag: 'sigr-test-notif',
+        data: { type: 'test' },
+        vibrate: [150, 80, 150, 80, 200]
+      });
     },
     
     _logSent: function(options) {

@@ -5,7 +5,7 @@
   window.SIGR = window.SIGR || {};
 
   const CFG_KEY = 'backup_config';
-  const DEFAULT_FOLDER = 'SIGR Pro Backups';
+  const DEFAULT_FOLDER = 'BrayNotas Backups';
   const FORMAT = 'SIGR_BACKUP';
   const FORMAT_VERSION = 2;
 
@@ -97,7 +97,7 @@
         version: FORMAT_VERSION,
         createdAt: Date.now(),
         deviceId: await this._deviceId(),
-        app: 'SIGR Pro',
+        app: 'BrayNotas',
         records: await this._collectRecords(),
         local: this._collectLocalStorage(),
         stores: stores

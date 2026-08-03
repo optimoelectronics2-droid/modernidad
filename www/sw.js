@@ -1,4 +1,4 @@
-﻿const CACHE = 'sigr-cache-v5';
+﻿const CACHE = 'sigr-cache-v6';
 const ASSETS = [
   '/index.html',
   '/manifest.json',
@@ -76,15 +76,55 @@ self.addEventListener('fetch', e => {
 });
 
 self.addEventListener('message', e => {
-  if (e.data && e.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
+  if (!e.data) return;
+  if (e.data.type === 'SKIP_WAITING') { self.skipWaiting(); return; }
+  if (e.data.type === 'SCHEDULE_NOTIFICATION') {
+    const n = e.data.notification;
+    if (!n) return;
+    const delay = (n.date || 0) - Date.now();
+    if (delay <= 0) { self._showNow(n); return; }
+    setTimeout(() => self._showNow(n), delay);
+  }
+  if (e.data.type === 'SHOW_NOTIFICATION') {
+    self._showNow(e.data.notification);
   }
 });
 
+self._showNow = function(n) {
+  const opts = {
+    body: n.body || '',
+    icon: n.icon || 'icons/icon-192.png',
+    badge: n.badge || 'icons/icon-72.png',
+    tag: n.tag || 'sigr-notification',
+    data: n.data || {},
+    vibrate: (n.data && n.data.vibrate) || [100, 50, 100],
+    renotify: true,
+    requireInteraction: true,
+    actions: [
+      { action: 'open', title: 'Abrir' },
+      { action: 'snooze', title: 'Posponer 10 min' }
+    ]
+  };
+  self.registration.showNotification(n.title || 'BrayNotas', opts).catch(() => {});
+};
+
 self.addEventListener('notificationclick', e => {
   e.notification.close();
+  const action = e.action;
   const data = e.notification.data || {};
   const url = data.url || '/index.html';
+
+  if (action === 'snooze' && data.reminderId) {
+    e.waitUntil(
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+        for (const client of list) {
+          try { client.postMessage({ type: 'SNOOZE_REMINDER', reminderId: data.reminderId }); } catch(err) {}
+        }
+        return self.clients.openWindow(url);
+      })
+    );
+    return;
+  }
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
       for (const client of clientList) {

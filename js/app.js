@@ -309,6 +309,31 @@
         case 'clearSignature': clearSignature(); break;
         case 'toggleFormSection': window.SIGR.FormView.toggleSection(el.dataset.section); break;
         case 'dismissNotif': el.closest('.notif-fallback')?.remove(); break;
+        case 'notifOpen': window.SIGR.StateService.go('reminders'); break;
+        case 'notifSnooze': {
+          const rid = el.dataset.rid;
+          if (rid) await snoozeReminder(rid);
+          if (el.closest('.notif-fallback')) el.closest('.notif-fallback').remove();
+          break;
+        }
+        case 'enableNotifs': {
+          const perm = await window.SIGR.NotificationService.requestPermission();
+          if (perm === 'granted') showToast('Notificaciones activadas ✓');
+          else showToast(perm === 'denied' ? 'Bloqueado por el navegador. Actívalas en Ajustes del sitio (icono de candado/🔔 en la barra).' : 'Permiso no concedido aún');
+          window.SIGR.StateService.go('settings');
+          break;
+        }
+        case 'testNotification': {
+          if (!window.SIGR.NotificationService.canNotify()) {
+            const perm = await window.SIGR.NotificationService.requestPermission();
+            if (perm !== 'granted' && perm !== 'default') {
+              showToast('Primero activa las notificaciones de este sitio');
+              break;
+            }
+          }
+          await window.SIGR.NotificationService.sendTest();
+          break;
+        }
         
         case 'attachFile': triggerFileAttach(mod, id); break;
         /* Sidebar & Global nav */
@@ -1028,7 +1053,7 @@
         <div class="desc"><strong>Descripción:</strong><br>${esc(mov.description||'')}</div>
         ${mov.motivo ? `<div class="row"><strong>Motivo:</strong> ${esc(mov.motivo)}</div>` : ''}
         ${mov.observaciones ? `<div class="row"><strong>Observaciones:</strong> ${esc(mov.observaciones)}</div>` : ''}
-        <div class="footer">SIGR Pro - Documento generado el ${new Date().toLocaleString('es-ES')}</div>
+        <div class="footer">BrayNotas - Documento generado el ${new Date().toLocaleString('es-ES')}</div>
       </body></html>`);
       w.document.close();
       w.print();
@@ -1803,7 +1828,23 @@
       
       try { generatePwaIcons(); } catch(e) { console.warn('PWA icons:', e); }
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
+        navigator.serviceWorker.register('sw.js', { scope: './', updateViaCache: 'none' })
+          .then(reg => {
+            if (window.SIGR.NotificationService) window.SIGR.NotificationService._onServiceReady(reg);
+            reg.addEventListener('updatefound', () => {
+              const sw = reg.installing || reg.waiting;
+              if (sw) sw.postMessage({ type: 'SKIP_WAITING' });
+            });
+          })
+          .catch(e => console.warn('SW register:', e));
+        navigator.serviceWorker.addEventListener('message', e => {
+          if (!e.data || e.data.type !== 'SNOOZE_REMINDER') return;
+          if (window.SIGR.ReminderService && e.data.reminderId) {
+            window.SIGR.ReminderService.snooze(e.data.reminderId, 10).then(() => {
+              if (typeof showToast === 'function') showToast('Recordatorio pospuesto 10 min');
+            }).catch(() => {});
+          }
+        });
       }
       
       dataReady = true;

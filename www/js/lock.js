@@ -70,7 +70,7 @@
     el.innerHTML = '<div class="pin-lock-bg">'
       + '<div class="pin-lock-card">'
       + '<div class="pin-lock-icon">🔒</div>'
-      + '<div class="pin-lock-title">SIGR Pro</div>'
+      + '<div class="pin-lock-title">BrayNotas</div>'
       + '<div class="pin-lock-sub">Ingresa tu PIN de acceso</div>'
       + '<div class="pin-dots" id="pinDots"><span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span></div>'
       + '<div class="pin-error" id="pinError"></div>'

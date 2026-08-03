@@ -1,6 +1,6 @@
 {
-  "appId": "com.sigr.pro",
-  "appName": "SIGR Pro",
+  "appId": "com.braynotas.app",
+  "appName": "BrayNotas",
   "webDir": "www",
   "server": {
     "androidScheme": "https"

@@ -1,7 +1,7 @@
 {
-  "name": "Sistema Inteligente de Gestión de Registros",
-  "short_name": "SIGR Pro",
-  "description": "Sistema profesional de gestión de registros, expedientes, pagos, pendientes y más.",
+  "name": "BrayNotas - Gestión Inteligente",
+  "short_name": "BrayNotas",
+  "description": "Sistema profesional de gestión de registros, expedientes, pagos, pendientes y más. Con copias de seguridad automáticas cifradas en Google Drive.",
   "start_url": "/index.html",
   "display": "standalone",
   "orientation": "portrait",

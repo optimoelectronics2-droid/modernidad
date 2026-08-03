@@ -64,7 +64,7 @@
           body: body || '',
           html: html || '',
           from: this._config.fromEmail,
-          fromName: this._config.fromName || 'SIGR Pro'
+          fromName: this._config.fromName || 'BrayNotas'
         };
         
         await window.SIGR.ActivityService.log('EMAIL_SENT', {

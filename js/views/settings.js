@@ -67,7 +67,7 @@
         <div class="settings-section">
           <div class="settings-section-title">🔐 Información</div>
           <div class="settings-card" style="flex-direction:column;align-items:flex-start;gap:4px">
-            <div class="st">SIGR Pro v1.0.0</div>
+            <div class="st">BrayNotas v1.0.0</div>
             <div style="font-size:12px;color:var(--text-faint)">Sistema Inteligente de Gestión de Registros</div>
             <div style="font-size:12px;color:var(--text-faint)">Diseñado para gestión personal y empresarial</div>
           </div>
@@ -93,9 +93,29 @@
         if (saved) cfg = Object.assign(cfg, saved);
       } catch(e) {}
       
+      let permLabel = 'Pendiente de permiso';
+      let permClass = 'warn';
+      let granted = false;
+      try {
+        const ns = window.SIGR.NotificationService;
+        if (ns.isNative()) { permLabel = 'Nativo (app)'; permClass = 'ok'; granted = true; }
+        else if (ns.canNotify()) { permLabel = 'Activadas ✓'; permClass = 'ok'; granted = true; }
+        else if (ns.getPermission() === 'denied') { permLabel = 'Bloqueado por el navegador'; permClass = 'err'; }
+        else { permLabel = 'No solicitado todavía'; permClass = 'warn'; }
+      } catch(e) {}
+      
       return `<div class="view">
         ${topbar('Notificaciones')}
         <div class="form-wrap">
+          <div class="settings-card" style="border-left:3px solid ${granted ? 'var(--success,#12D68A)' : 'var(--warning,#F5A623)'}">
+            <div style="font-weight:700;font-size:15px;margin-bottom:6px">Notificaciones del sistema</div>
+            <div style="font-size:13px;color:var(--text-dim);margin-bottom:10px">Estado: <span class="perm-pill ${permClass}">${permLabel}</span></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-primary btn-sm" data-action="enableNotifs" style="--mc:#9C8CFF">🔔 Activar notificaciones</button>
+              <button class="btn btn-sm" data-action="testNotification">🧪 Probar notificación</button>
+            </div>
+            <div style="font-size:11.5px;color:var(--text-dim);margin-top:10px;line-height:1.5">Las notificaciones reales (toque + sonido) aparecen aunque estés en otra pestaña, si instalas la app: menú ⋮ › <b>Instalar aplicación</b> ó <b>Añadir a pantalla de inicio</b>.</div>
+          </div>
           <div class="field">
             <label>Correo principal para notificaciones</label>
             <input type="email" id="cfgNotifEmail" value="${cfg.email}" placeholder="tucorreo@ejemplo.com">
