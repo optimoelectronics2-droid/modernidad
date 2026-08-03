@@ -1122,6 +1122,7 @@
       message: document.getElementById('remMessage')?.value || '',
       date: document.getElementById('remDate')?.value || new Date().toISOString().slice(0,10),
       time: document.getElementById('remTime')?.value || '09:00',
+      remindBefore: parseInt(document.getElementById('remAdvance')?.value || '0', 10) || 0,
       priority: document.getElementById('remPriority')?.value || 'media',
       frequency: document.getElementById('remFrequency')?.value || 'once',
       channels: channels,
@@ -1810,6 +1811,12 @@
       
       window.SIGR.NotificationService.init();
       console.log('NotificationService native:', window.SIGR.NotificationService.isNative(), 'permission:', window.SIGR.NotificationService.getPermission());
+      if (window.SIGR.ReminderService && window.SIGR.ReminderService.resyncSchedules) {
+        window.SIGR.ReminderService.resyncSchedules().catch(() => {});
+      }
+      if (window.SIGR.AgendaService && window.SIGR.AgendaService.resyncSchedules) {
+        window.SIGR.AgendaService.resyncSchedules().catch(() => {});
+      }
       if (window.SIGR.NotificationService.isNative() || window.SIGR.NotificationService.getPermission() === 'default') {
         const perm = await window.SIGR.NotificationService.requestPermission();
         console.log('Notification permission result:', perm);

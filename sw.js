@@ -1,4 +1,4 @@
-﻿const CACHE = 'sigr-cache-v6';
+﻿const CACHE = 'sigr-cache-v7';
 const ASSETS = [
   '/index.html',
   '/manifest.json',

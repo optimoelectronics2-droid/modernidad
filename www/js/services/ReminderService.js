@@ -26,6 +26,7 @@
         message: data.message || '',
         date: data.date || today(),
         time: data.time || '09:00',
+        remindBefore: data.remindBefore || 0,
         priority: data.priority || 'media',
         type: data.type || 'general',
         frequency: data.frequency || 'once',
@@ -203,20 +204,116 @@
       }
     },
     
-    _scheduleNotification: function(reminder) {
-      const notifDate = new Date(reminder.date + 'T' + (reminder.time || '09:00'));
-      const opts = {
-        title: '\uD83D\uDD14 ' + (reminder.title || 'Recordatorio'),
-        body: reminder.message || reminder.recordTitle || '',
-        tag: 'reminder-' + reminder.id,
-        data: { type: 'reminder', reminderId: reminder.id, moduleId: reminder.moduleId, recordId: reminder.recordId },
-        vibrate: [200, 100, 200, 100, 200]
+    resyncSchedules: async function() {
+      if (!window.SIGR.NotificationService) return;
+      const now = Date.now();
+      try {
+        const all = await this.getAll();
+        for (const r of all) {
+          if (r.status !== 'pending' && r.status !== 'snoozed') continue;
+          const base = new Date(r.date + 'T' + (r.time || '09:00'));
+          if (isNaN(base.getTime())) continue;
+          if (r.frequency && r.frequency !== 'once') {
+            const main = this._nextOccurrence(base, now, r.frequency);
+            this._scheduleOccurrence(r, main, now);
+          } else if (base.getTime() > now) {
+            this._scheduleOccurrence(r, base, now);
+          }
+        }
+      } catch(e) {}
+    },
+    
+    _nextOccurrence: function(base, now, freq) {
+      const d = new Date(base);
+      if (freq === 'daily') { while (d.getTime() <= now) d.setDate(d.getDate() + 1); }
+      else if (freq === 'weekly') { while (d.getTime() <= now) d.setDate(d.getDate() + 7); }
+      else if (freq === 'monthly') { while (d.getTime() <= now) d.setMonth(d.getMonth() + 1); }
+      else if (freq === 'annual') { while (d.getTime() <= now) d.setFullYear(d.getFullYear() + 1); }
+      return d;
+    },
+    
+    _scheduleOccurrence: function(reminder, atDate, now) {
+      const adv = reminder.remindBefore || 0;
+      const tagBase = 'reminder-' + reminder.id;
+      const data = { type: 'reminder', reminderId: reminder.id, moduleId: reminder.moduleId, recordId: reminder.recordId };
+      const title = reminder.title || 'Recordatorio';
+      const body = reminder.message || reminder.recordTitle || '';
+      
+      const fire = (opts, date) => {
+        if (date.getTime() <= now) {
+          window.SIGR.NotificationService.sendLocal(opts);
+        } else {
+          window.SIGR.NotificationService.schedule(opts, date, reminder.frequency);
+        }
       };
-      if (notifDate.getTime() <= Date.now()) {
-        window.SIGR.NotificationService.sendLocal(opts);
-      } else {
-        window.SIGR.NotificationService.schedule(opts, notifDate, reminder.frequency);
+      
+      if (adv > 0) {
+        const advDate = new Date(atDate.getTime() - adv * 60000);
+        if (advDate.getTime() > now) {
+          let label;
+          if (adv >= 1440) label = '1 dia';
+          else if (adv >= 60) label = (adv / 60) + ' hora' + ((adv / 60) === 1 ? '' : 's');
+          else label = adv + ' min';
+          fire({
+            title: '\u23F3 ' + title,
+            body: 'Falta ' + label + ': ' + body,
+            tag: tagBase + '-adv',
+            data: data,
+            vibrate: [200, 100, 200]
+          }, advDate);
+        }
       }
+      
+      fire({
+        title: '\uD83D\uDD14 ' + title,
+        body: body,
+        tag: tagBase,
+        data: data,
+        vibrate: [200, 100, 200, 100, 200]
+      }, atDate);
+    },
+    
+    _scheduleNotification: function(reminder) {
+      const base = new Date(reminder.date + 'T' + (reminder.time || '09:00'));
+      const now = Date.now();
+      const advMin = reminder.remindBefore || 0;
+      const tagBase = 'reminder-' + reminder.id;
+      const data = { type: 'reminder', reminderId: reminder.id, moduleId: reminder.moduleId, recordId: reminder.recordId };
+      const title = reminder.title || 'Recordatorio';
+      const body = reminder.message || reminder.recordTitle || '';
+      
+      const fire = (opts, date) => {
+        if (date.getTime() <= now) {
+          window.SIGR.NotificationService.sendLocal(opts);
+        } else {
+          window.SIGR.NotificationService.schedule(opts, date, reminder.frequency);
+        }
+      };
+      
+      if (advMin > 0) {
+        const advDate = new Date(base.getTime() - advMin * 60000);
+        if (advDate.getTime() > now) {
+          let label;
+          if (advMin >= 1440) label = '1 dia';
+          else if (advMin >= 60) label = (advMin / 60) + ' hora' + ((advMin / 60) === 1 ? '' : 's');
+          else label = advMin + ' min';
+          fire({
+            title: '\u23F3 ' + title,
+            body: 'Falta ' + label + ': ' + body,
+            tag: tagBase + '-adv',
+            data: data,
+            vibrate: [200, 100, 200]
+          }, advDate);
+        }
+      }
+      
+      fire({
+        title: '\uD83D\uDD14 ' + title,
+        body: body,
+        tag: tagBase,
+        data: data,
+        vibrate: [200, 100, 200, 100, 200]
+      }, base);
     },
     
     _scheduleEmail: function(reminder) {

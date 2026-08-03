@@ -33,6 +33,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Inyectar secreto de Google (js/secret.js)
+        env:
+          WEB_CLIENT_SECRET: ${{ secrets.WEB_CLIENT_SECRET }}
+        run: |
+          if [ -n "$WEB_CLIENT_SECRET" ]; then
+            mkdir -p www/js
+            echo "window.SIGR = window.SIGR || {};" > www/js/secret.js
+            echo "window.SIGR.WEB_CLIENT_SECRET = '$WEB_CLIENT_SECRET';" >> www/js/secret.js
+          else
+            echo "::warning::Secret WEB_CLIENT_SECRET no definido - login Google nativo no funcionara"
+          fi
+
       - name: Sync Capacitor (copia www -> android nativo)
         run: npx cap sync android
 

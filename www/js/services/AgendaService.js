@@ -49,21 +49,29 @@
         description: data.description || '',
         completed: false
       };
-      return S().addAgendaEvent(event);
+      const saved = await S().addAgendaEvent(event);
+      this._scheduleEvent(saved);
+      return saved;
     },
 
     async updateEvent(data) {
       const existing = await S().getAgendaEvent(data.id);
       if (!existing) return null;
+      this._cancelEvent(existing.id);
       Object.assign(existing, {
         title: data.title, type: data.type, priority: data.priority,
         date: data.date, time: data.time, reminder: data.reminder,
         location: data.location, description: data.description
       });
-      return S().updateAgendaEvent(existing);
+      const saved = await S().updateAgendaEvent(existing);
+      this._scheduleEvent(saved);
+      return saved;
     },
 
-    async deleteEvent(id) { return S().deleteAgendaEvent(id); },
+    async deleteEvent(id) {
+      this._cancelEvent(id);
+      return S().deleteAgendaEvent(id);
+    },
     async getEvent(id) { return S().getAgendaEvent(id); },
 
     async getEvents(filter) {
@@ -89,13 +97,65 @@
       const ev = await S().getAgendaEvent(id);
       if (!ev) return;
       ev.completed = !ev.completed;
-      return S().updateAgendaEvent(ev);
+      const saved = await S().updateAgendaEvent(ev);
+      if (saved.completed) { this._cancelEvent(saved.id); }
+      else { this._scheduleEvent(saved); }
+      return saved;
+    },
+
+    _cancelEvent: function(id) {
+      if (window.SIGR.NotificationService) {
+        window.SIGR.NotificationService.cancelByTag('agenda-event-' + id);
+      }
+    },
+
+    _scheduleEvent: function(event) {
+      if (!event || event.completed || !window.SIGR.NotificationService) return;
+      const remMin = event.reminder || 0;
+      const base = new Date(event.date + 'T' + (event.time || '09:00'));
+      if (isNaN(base.getTime())) return;
+      const now = Date.now();
+      const notifyAt = remMin > 0 ? new Date(base.getTime() - remMin * 60000) : base;
+      
+      const opts = {
+        title: '\uD83D\uDCC5 ' + (event.title || 'Evento'),
+        body: (remMin > 0
+          ? (remMin >= 1440 ? 'Falta 1 dia' : remMin >= 60 ? 'Falta ' + (remMin / 60) + ' hora(s)' : 'Falta ' + remMin + ' min') + ': '
+          : '') + (event.location || ''),
+        tag: 'agenda-event-' + event.id,
+        data: { type: 'agenda', eventId: event.id },
+        vibrate: [200, 100, 200, 100, 200]
+      };
+      
+      if (notifyAt.getTime() <= now) {
+        if (now - notifyAt.getTime() <= 12000) {
+          window.SIGR.NotificationService.sendLocal(opts);
+        }
+        return;
+      }
+      window.SIGR.NotificationService.schedule(opts, notifyAt, null);
     },
 
     async getTodayCount() {
       const today = new Date().toISOString().slice(0,10);
       const events = await S().getAllAgendaEvents(e => e.date === today && !e.completed);
       return events.length;
+    },
+
+    async resyncSchedules() {
+      if (!window.SIGR.NotificationService) return;
+      try {
+        const now = Date.now();
+        const events = await this.getEvents(e => e && !e.completed);
+        for (const ev of events) {
+          const base = new Date(ev.date + 'T' + (ev.time || '09:00'));
+          if (isNaN(base.getTime())) continue;
+          const remMin = ev.reminder || 0;
+          const notifyAt = remMin > 0 ? new Date(base.getTime() - remMin * 60000) : base;
+          if (now > Math.max(base.getTime(), notifyAt.getTime())) continue;
+          this._scheduleEvent(ev);
+        }
+      } catch(e) {}
     }
   };
 

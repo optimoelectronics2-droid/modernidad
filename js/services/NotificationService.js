@@ -280,6 +280,14 @@
       if (this._isNative) {
         const nid = _hashId(options.tag || ('sigr-' + Date.now()));
         const every = frequency ? _everyFromFreq(frequency) : null;
+        const sched = { at: date, allowWhileIdle: true };
+        if (every) {
+          sched.every = every;
+          sched.repeats = true;
+          sched.count = 365;
+        } else {
+          sched.exact = true;
+        }
         try {
           await NativeNotifications.schedule([{
             id: nid,
@@ -287,13 +295,7 @@
             body: options.body || '',
             smallIcon: 'ic_stat_icon',
             iconColor: '#9C8CFF',
-            schedule: {
-              at: date,
-              every: every,
-              repeats: !!every,
-              allowWhileIdle: true,
-              count: every ? 365 : undefined
-            },
+            schedule: sched,
             extra: options.data || {},
             actionTypeId: ''
           }]);
@@ -327,8 +329,8 @@
     
     cancelByReminderId: async function(reminderId) {
       if (!reminderId) return;
-      const tag = 'reminder-' + reminderId;
-      await this.cancelByTag(tag);
+      await this.cancelByTag('reminder-' + reminderId);
+      await this.cancelByTag('reminder-' + reminderId + '-adv');
     },
     
     cancelAllNative: async function() {
@@ -455,6 +457,7 @@
         const all = await window.SIGR.ReminderService.getAll();
         const rem = all.find(r => r.id === reminderId);
         if (!rem || rem.status === 'completed') return;
+        if (rem.frequency && rem.frequency !== 'once') return;
         rem.status = 'sent';
         rem.sentAt = Date.now();
         await window.SIGR.ReminderService.update(rem);
