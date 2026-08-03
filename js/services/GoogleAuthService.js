@@ -8,8 +8,11 @@
   const TOKEN_URI = 'https://oauth2.googleapis.com/token';
   const DEVICE_URI = 'https://oauth2.googleapis.com/device/code';
   const ACC_CFG_KEY = 'drive_accounts';
+  /* Cliente "Aplicación web" de SIGR Pro (integrado): login profesional sin configuraciones.
+     El client_secret vive en js/secret.js (no se sube a GitHub) y solo se usa en el flujo
+     de código de respaldo; el popup de Google no lo necesita. */
+  const WEB_CLIENT_ID = '216094399381-9necjsos57lqmtmp26unofr307bel49l.apps.googleusercontent.com';
   const DEFAULT_CLIENT_ID = '216094399381-uf8untlhtqnh4p6mea05nehfvrgcurci.apps.googleusercontent.com';
-  const WEB_CLIENT_ID = ''; /* Client ID de respaldo tipo "Aplicación web" (opcional, se prefiere el guardado en la app) */
 
   const GoogleAuthService = {
     _accounts: [],
@@ -79,16 +82,20 @@
       } catch(e) { return null; }
     },
 
-    /* Client ID y Client Secret guardados en la app (los pegas en Copias de seguridad) */
+    /* Credenciales del cliente web de SIGR Pro (integradas, sin pasos previos) */
     async getClientCredential() {
+      const hard = {
+        clientId: WEB_CLIENT_ID,
+        clientSecret: (window.SIGR.WEB_CLIENT_SECRET || '')
+      };
       try {
         const cfg = await window.SIGR.BackupService.getConfig();
         return {
           clientId: (cfg.webClientId || WEB_CLIENT_ID || '').trim(),
-          clientSecret: (cfg.clientSecret || '').trim()
+          clientSecret: (cfg.clientSecret || window.SIGR.WEB_CLIENT_SECRET || '').trim()
         };
       } catch(e) {
-        return { clientId: WEB_CLIENT_ID.trim(), clientSecret: '' };
+        return hard;
       }
     },
 
@@ -172,7 +179,10 @@
         return account;
       } catch(e) {
         if (/canceled|denied|rechaz/i.test(e.message)) throw e;
-        return this.startDeviceFlow(cid, cred.clientSecret);
+        if (/No se pudo cargar/i.test(e.message)) {
+          return this.startDeviceFlow(cid, cred.clientSecret);
+        }
+        throw e;
       }
     },
 

@@ -270,7 +270,7 @@
         case 'bsSavePassphrase': case 'bsRestore': case 'bsDoRestore': case 'bsRestoreMode':
         case 'bsDeleteBackup': case 'bsRefresh': case 'bsExportLocal': case 'bsImportLocal':
         case 'bsImportFileChosen': case 'bsConnectPersonal': case 'bsOpenDevicePage':
-        case 'bsCopyUserCode': case 'bsSaveWebCid': case 'bsConfirmPrompt':
+        case 'bsCopyUserCode': case 'bsConfirmPrompt':
           await window.SIGR.BackupSettingsView.handleAction(el); break;
         case 'closeModal': closeModal(); break;
         case 'deleteAllMovements': await deleteAllMovements(mod, id); break;

@@ -44,9 +44,6 @@
           <button class="btn btn-ghost danger" style="font-size:11px;padding:4px 8px" data-action="bsRemoveAccount" data-account="${a.id}">✕</button>
         </div>`).join('') || '<div class="empty" style="padding:16px"><div class="etext">Sin cuentas. Conecta tu cuenta de Google para activar las copias automáticas.</div></div>';
 
-      const cred = await GA.getClientCredential().catch(() => ({ clientId: '', clientSecret: '' }));
-      const webCid = cred.clientId;
-
       const backupRows = backups.slice(0, 20).map(b => `
         <div class="settings-card">
           <div class="si">${b.encrypted ? '🔐' : '📦'}</div>
@@ -84,14 +81,6 @@
           <div class="settings-section-title">👤 Cuentas de Google</div>
           ${accountRows}
           <button class="btn btn-primary" data-action="bsConnectPersonal" style="--mc:#5CA8FF;margin-top:8px">＋ Iniciar sesión con Google</button>
-          ${!webCid ? `
-          <div class="settings-card" style="flex-direction:column;align-items:flex-start;gap:8px;margin-top:10px;background:rgba(92,168,255,.06);border-color:rgba(92,168,255,.25)">
-            <div style="font-size:13px;font-weight:600">🔑 Conectar tu cliente de Google (paso único, 2 minutos)</div>
-            <div style="font-size:12px;color:var(--text-dim);line-height:1.5">Google exige las credenciales de tu proyecto para poder conectarte. Ve a <b>console.cloud.google.com</b> → <b>APIs y servicios</b> → <b>Credenciales</b> → pulsa en tu cliente OAuth (o crea uno de tipo <b>"Aplicación web"</b>) → botón <b>Descargar JSON</b>. Luego pega aquí el contenido completo del archivo:</div>
-            <textarea id="bsWebCid" rows="3" style="width:100%;font-family:monospace;font-size:11px" placeholder='{"web":{"client_id":"...apps.googleusercontent.com","client_secret":"..."}}'></textarea>
-            <button class="btn btn-ghost" data-action="bsSaveWebCid" style="font-size:12px">Guardar y conectar</button>
-            <div style="font-size:11px;color:var(--text-faint)">Con el JSON pegado, el inicio de sesión funciona ya. Si el cliente es tipo "Aplicación web" con origen autorizado <b>${esc((typeof location !== 'undefined' && location.origin) || 'https://modernidad-284.netlify.app')}</b>, además se abrirá la ventana de Google como en YouTube (solo eliges tu cuenta, sin código).</div>
-          </div>` : ''}
 
           <div class="settings-section-title">⚙ Automático</div>
           <div class="field">
@@ -212,23 +201,6 @@
           const flow = this._state.flow;
           if (!flow) return;
           window.open(flow.verificationUrl, '_blank', 'noopener');
-          break;
-        }
-
-        case 'bsSaveWebCid': {
-          const raw = document.getElementById('bsWebCid')?.value || '';
-          if (!raw.trim()) { showToast('Pega el JSON o el Client ID primero'); break; }
-          try {
-            const saved = await GA.saveClientInput(raw);
-            if (saved.clientSecret) {
-              showToast('Credenciales guardadas ✓ Toca "Iniciar sesión con Google"');
-            } else {
-              showToast('Client ID guardado ✓ Toca "Iniciar sesión con Google"');
-            }
-            this.refresh();
-          } catch(e) {
-            showToast(e.message || 'No se pudo guardar');
-          }
           break;
         }
 
