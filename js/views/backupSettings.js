@@ -200,7 +200,15 @@
         case 'bsOpenDevicePage': {
           const flow = this._state.flow;
           if (!flow) return;
-          window.open(flow.verificationUrl, '_blank', 'noopener');
+          if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && window.Capacitor.Plugins.Browser) {
+            try {
+              window.Capacitor.Plugins.Browser.open({ url: flow.verificationUrl });
+            } catch(e) {
+              window.open(flow.verificationUrl, '_blank', 'noopener');
+            }
+          } else {
+            window.open(flow.verificationUrl, '_blank', 'noopener');
+          }
           break;
         }
 

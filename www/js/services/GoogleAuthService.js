@@ -123,6 +123,10 @@
       await window.SIGR.BackupService.saveConfig(cfg);
     },
 
+    _isNativeApp: function() {
+      return typeof window.Capacitor !== 'undefined' && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+    },
+
     /* Acepta el JSON descargado de la consola (tiene client_id + client_secret) o solo el Client ID */
     async saveClientInput(raw) {
       const text = (raw || '').trim();
@@ -149,6 +153,7 @@
       const cred = await this.getClientCredential();
       const cid = cred.clientId;
       if (!cid) return this.startDeviceFlow(DEFAULT_CLIENT_ID, cred.clientSecret);
+      if (this._isNativeApp()) return this.startDeviceFlow(cid, cred.clientSecret);
 
       try {
         const g = await this._gisLoad();
