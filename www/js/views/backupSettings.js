@@ -44,6 +44,8 @@
           <button class="btn btn-ghost danger" style="font-size:11px;padding:4px 8px" data-action="bsRemoveAccount" data-account="${a.id}">✕</button>
         </div>`).join('') || '<div class="empty" style="padding:16px"><div class="etext">Sin cuentas. Conecta tu cuenta de Google para activar las copias automáticas.</div></div>';
 
+      const webCid = await GA.getWebClientId().catch(() => '');
+
       const backupRows = backups.slice(0, 20).map(b => `
         <div class="settings-card">
           <div class="si">${b.encrypted ? '🔐' : '📦'}</div>
@@ -81,6 +83,16 @@
           <div class="settings-section-title">👤 Cuentas de Google</div>
           ${accountRows}
           <button class="btn btn-primary" data-action="bsConnectPersonal" style="--mc:#5CA8FF;margin-top:8px">＋ Iniciar sesión con Google</button>
+          ${!webCid ? `
+          <div class="settings-card" style="flex-direction:column;align-items:flex-start;gap:8px;margin-top:10px;background:rgba(92,168,255,.06);border-color:rgba(92,168,255,.25)">
+            <div style="font-size:13px;font-weight:600">Inicio de sesión normal (ventana de Google)</div>
+            <div style="font-size:12px;color:var(--text-dim)">Para que se abra la ventana de Google donde solo eliges tu cuenta (sin código), crea un cliente OAuth <b>tipo "Aplicación web"</b> en <b>console.cloud.google.com</b> → Credenciales → Crear credenciales → ID de cliente OAuth, con origen autorizado <b>${esc((typeof location !== 'undefined' && location.origin) || 'https://modernidad-284.netlify.app')}</b>, y pega aquí su Client ID:</div>
+            <div style="display:flex;gap:8px;width:100%">
+              <input type="text" id="bsWebCid" placeholder="1234-abcd....apps.googleusercontent.com" style="flex:1;min-width:0" value="${esc(cfg.webClientId || '')}">
+              <button class="btn btn-ghost" data-action="bsSaveWebCid" style="font-size:12px">Guardar</button>
+            </div>
+            <div style="font-size:11px;color:var(--text-faint)">Sin esto, el inicio de sesión usa el método de código (device flow), que también funciona pero requiere escribir un código.</div>
+          </div>` : ''}
 
           <div class="settings-section-title">⚙ Automático</div>
           <div class="field">
@@ -161,9 +173,7 @@
             } else {
               showToast('Sesión iniciada: ' + (res.email || 'Google') + ' ✓');
               const cfg = await BS.getConfig();
-              const active = GA.getAccounts().find(a => a.id === cfg.activeAccountId);
-              const activeSaNoFolder = active && active.type === 'sa' && !(cfg.folders || {})[active.id];
-              if (!cfg.activeAccountId || activeSaNoFolder) {
+              if (!cfg.activeAccountId) {
                 cfg.activeAccountId = res.id;
                 await BS.saveConfig(cfg);
               }
@@ -180,6 +190,16 @@
           const flow = this._state.flow;
           if (!flow) return;
           window.open(flow.verificationUrl, '_blank', 'noopener');
+          break;
+        }
+
+        case 'bsSaveWebCid': {
+          const cid = (document.getElementById('bsWebCid')?.value || '').trim();
+          if (!cid) { showToast('Pega el Client ID primero'); break; }
+          if (!/^[\w.-]+\.apps\.googleusercontent\.com$/.test(cid)) { showToast('Ese no parece un Client ID de Google'); break; }
+          await GA.setWebClientId(cid);
+          showToast('Client ID guardado. Toca "Iniciar sesión con Google" de nuevo ✓');
+          this.refresh();
           break;
         }
 
@@ -355,18 +375,21 @@
     _pollDevice: async function(flow) {
       const GA = window.SIGR.GoogleAuthService;
       const BS = window.SIGR.BackupService;
+      const modalOpen = () => {
+        const m = document.getElementById('modal');
+        return !!m && m.classList.contains('open');
+      };
       try {
-        const tokenResult = await GA.pollDeviceFlow(flow, () => {});
+        const tokenResult = await GA.pollDeviceFlow(flow, () => {}, () => !modalOpen());
         const account = await GA.finishOAuthAccount(flow, tokenResult);
         const status = document.getElementById('bsDeviceStatus');
         if (status) status.innerHTML = '<span style="color:#12D68A">✅ Autorizado correctamente</span>';
         setTimeout(async () => {
+          if (!modalOpen()) return;
           closeModal();
           try {
             const cfg = await BS.getConfig();
-            const active = GA.getAccounts().find(a => a.id === cfg.activeAccountId);
-            const activeSaNoFolder = active && active.type === 'sa' && !(cfg.folders || {})[active.id];
-            if (!cfg.activeAccountId || activeSaNoFolder) {
+            if (!cfg.activeAccountId) {
               cfg.activeAccountId = account.id;
               await BS.saveConfig(cfg);
               showToast('Cuenta conectada y activada: ' + (account.email || 'Google') + ' ✓');
@@ -377,11 +400,12 @@
           this.refresh();
         }, 700);
       } catch(e) {
+        if (e.message === '__stopped__') return;
         const status = document.getElementById('bsDeviceStatus');
         if (status) {
           status.innerHTML = '<span style="color:#FB5A7E">✖ ' + esc(e.message || 'Error') + '</span>';
         } else {
-          showToast(e.message || 'Error de autenticación');
+          showToast((e.message || 'Error de autenticación') + ' — Toca "Iniciar sesión" de nuevo');
         }
       }
     },

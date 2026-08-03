@@ -1,4 +1,4 @@
-const CACHE = 'sigr-cache-v5';
+﻿const CACHE = 'sigr-cache-v5';
 const ASSETS = [
   '/index.html',
   '/manifest.json',
@@ -19,7 +19,6 @@ const ASSETS = [
   '/js/services/ReminderService.js',
   '/js/services/EmailService.js',
   '/js/services/SchedulerService.js',
-  '/js/services/SyncService.js',
   '/js/services/FinanceService.js',
   '/js/services/AgendaService.js',
   '/js/services/VaultService.js',

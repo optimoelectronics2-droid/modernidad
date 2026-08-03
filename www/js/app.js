@@ -266,13 +266,11 @@
         case 'vaultConfirmDelete': case 'vaultCopyField': case 'vaultTogglePass':
           await window.SIGR.VaultView.handleAction(el); break;
         /* Backup & Sync actions */
-        case 'bsAddAccount': case 'bsSaveAccountJson': case 'bsAddAccountFile': case 'bsAccountFileChosen':
         case 'bsRemoveAccount': case 'bsSetActive': case 'bsTestAccount': case 'bsBackupNow':
         case 'bsSavePassphrase': case 'bsRestore': case 'bsDoRestore': case 'bsRestoreMode':
         case 'bsDeleteBackup': case 'bsRefresh': case 'bsExportLocal': case 'bsImportLocal':
-        case 'bsImportFileChosen': case 'bsOpenFolderLink': case 'bsPickSharedFolder':
-        case 'bsSetFolder': case 'bsConfirmPrompt': case 'bsConnectPersonal': case 'bsStartDeviceFlow':
-        case 'bsCopyUserCode': case 'bsCopySaEmail': case 'bsSaveSharedFolderLink':
+        case 'bsImportFileChosen': case 'bsConnectPersonal': case 'bsOpenDevicePage':
+        case 'bsCopyUserCode': case 'bsSaveWebCid': case 'bsConfirmPrompt':
           await window.SIGR.BackupSettingsView.handleAction(el); break;
         case 'closeModal': closeModal(); break;
         case 'deleteAllMovements': await deleteAllMovements(mod, id); break;
@@ -1592,8 +1590,6 @@
     const BV = window.SIGR.BackupSettingsView;
     const bi = document.getElementById('bsImportFile');
     if (bi) bi.onchange = () => BV.handleAction({ dataset: { action: 'bsImportFileChosen' } });
-    const ba = document.getElementById('bsAccountFile');
-    if (ba) ba.onchange = () => BV.handleAction({ dataset: { action: 'bsAccountFileChosen' } });
   }
 
   /* ============ GLOBAL SEARCH ============ */
@@ -1755,6 +1751,19 @@
       }
       
       await window.SIGR.StorageService.ready();
+      await window.SIGR.PinLock.setup();
+      await window.SIGR.PinLock.ensure();
+      const appPin = window.SIGR.PinLock.getPin();
+      if (appPin) {
+        try {
+          const bcfg = await window.SIGR.BackupService.getConfig();
+          if (!bcfg.passphraseSet) {
+            await window.SIGR.BackupService.setPassphraseProtected(appPin);
+          } else if (!window.SIGR.BackupService.getPassphrase()) {
+            window.SIGR.BackupService.setPassphrase(appPin);
+          }
+        } catch(e) {}
+      }
       await loadAll();
       
       window.SIGR.NotificationService.init();
@@ -1767,7 +1776,6 @@
         }
       }
       window.SIGR.SchedulerService.start();
-      window.SIGR.SyncService.init();
       await window.SIGR.EmailService.loadConfig();
       try {
         await window.SIGR.SyncManager.init();

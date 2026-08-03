@@ -38,8 +38,8 @@
       if (!window.SIGR.ReminderService) return;
       window.SIGR.ReminderService.processDue().catch(() => {});
       
-      if (window.SIGR.SyncService) {
-        window.SIGR.SyncService.process().catch(() => {});
+      if (window.SIGR.SyncManager) {
+        window.SIGR.SyncManager.process().catch(() => {});
       }
       
       this._checkOnline();
@@ -49,8 +49,8 @@
       if (window.SIGR.EmailService) {
         window.SIGR.EmailService.sendPending().catch(() => {});
       }
-      if (window.SIGR.SyncService) {
-        window.SIGR.SyncService.process().catch(() => {});
+      if (window.SIGR.SyncManager) {
+        window.SIGR.SyncManager.process().catch(() => {});
       }
     },
     
