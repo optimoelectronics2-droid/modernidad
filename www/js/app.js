@@ -1752,7 +1752,23 @@
       
       await window.SIGR.StorageService.ready();
       await window.SIGR.PinLock.setup();
+      let oauthRet = null;
+      try { oauthRet = await window.SIGR.GoogleAuthService.handleOauthCallback(); } catch(e) { console.warn('OAuth callback:', e); }
       await window.SIGR.PinLock.ensure();
+      if (oauthRet) {
+        if (oauthRet.account) {
+          try {
+            const cfg = await window.SIGR.BackupService.getConfig();
+            if (!cfg.activeAccountId) {
+              cfg.activeAccountId = oauthRet.account.id;
+              await window.SIGR.BackupService.saveConfig(cfg);
+            }
+          } catch(e) {}
+          if (typeof showToast === 'function') setTimeout(() => showToast('Cuenta conectada: ' + (oauthRet.account.email || 'Google') + ' ✓'), 600);
+        } else if (oauthRet.error && oauthRet.error !== 'cancelado') {
+          if (typeof showToast === 'function') setTimeout(() => showToast(String(oauthRet.error)), 600);
+        }
+      }
       const appPin = window.SIGR.PinLock.getPin();
       if (appPin) {
         try {

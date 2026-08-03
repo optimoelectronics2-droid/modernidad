@@ -130,7 +130,10 @@
   PinLock.lock = lock;
 
   document.addEventListener('visibilitychange', function(){
-    if (document.hidden){ lock(); }
+    if (document.hidden){
+      try { if (sessionStorage.getItem('sigrPendingOauth') === '1') return; } catch(e) {}
+      lock();
+    }
   });
 
   window.SIGR.PinLock = PinLock;

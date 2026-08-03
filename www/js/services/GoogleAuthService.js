@@ -31,6 +31,23 @@
     },
 
     async _oauthRefresh(account) {
+      if (account.refreshToken) {
+        let body = 'grant_type=refresh_token&client_id=' + encodeURIComponent(account.clientId) +
+          '&refresh_token=' + encodeURIComponent(account.refreshToken);
+        try {
+          const secret = (await this.getClientCredential()).clientSecret;
+          if (secret) body += '&client_secret=' + encodeURIComponent(secret);
+        } catch(e) {}
+        const { status, json } = await this._postForm(TOKEN_URI, body);
+        if (status !== 200 || !json.access_token) {
+          throw new Error('Sesión expirada: vuelve a conectar la cuenta (' + (json.error_description || json.error || status) + ')');
+        }
+        if (json.refresh_token) account.refreshToken = json.refresh_token;
+        account.accessToken = json.access_token;
+        account.expiresAt = Date.now() + (json.expires_in - 60) * 1000;
+        this._persist();
+        return json.access_token;
+      }
       if (account.web) {
         const tok = await this._gisSilentRefresh(account);
         if (!tok) throw new Error('Sesión de Google expirada: vuelve a tocar "Iniciar sesión con Google"');
@@ -179,11 +196,116 @@
         return account;
       } catch(e) {
         if (/canceled|denied|rechaz/i.test(e.message)) throw e;
-        if (/No se pudo cargar/i.test(e.message)) {
-          return this.startDeviceFlow(cid, cred.clientSecret);
-        }
+        console.warn('GIS popup no disponible, abriendo página de Google:', e && e.message);
+        return this._redirectFlow(cid, cred.clientSecret);
+      }
+    },
+
+    /* ----- redirect flow (Google en página completa, funciona en cualquier navegador) ----- */
+
+    _redirectFlow(cid, clientSecret) {
+      const state = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      try {
+        sessionStorage.setItem('sigrPendingOauth', '1');
+        sessionStorage.setItem('sigrOauthState', state);
+      } catch(e) {}
+      const redirectUri = location.origin + '/';
+      const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
+        client_id: cid,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: SCOPES,
+        access_type: 'offline',
+        prompt: 'select_account',
+        state: state
+      });
+      location.href = url;
+      return new Promise(() => {});
+    },
+
+    async _exchangeCode(code, cid, secret) {
+      const redirectUri = location.origin + '/';
+      let body = 'code=' + encodeURIComponent(code) +
+        '&client_id=' + encodeURIComponent(cid) +
+        '&redirect_uri=' + encodeURIComponent(redirectUri) +
+        '&grant_type=authorization_code';
+      if (secret) body += '&client_secret=' + encodeURIComponent(secret);
+      const { status, json } = await this._postForm(TOKEN_URI, body);
+      if (status !== 200 || !json.access_token) {
+        throw new Error('Google rechazó el inicio de sesión: ' + (json.error_description || json.error || status));
+      }
+      return json;
+    },
+
+    /* Se llama al cargar la app: completa el inicio de sesión tras volver de Google */
+    async handleOauthCallback() {
+      let params = null;
+      try { params = new URLSearchParams(location.search); } catch(e) { return null; }
+      let pending = '';
+      try { pending = sessionStorage.getItem('sigrPendingOauth') || ''; } catch(e) {}
+      if (pending !== '1') return null;
+      try { sessionStorage.removeItem('sigrPendingOauth'); } catch(e) {}
+
+      if (params.get('error')) {
+        const err = params.get('error');
+        try { history.replaceState(null, '', location.pathname); } catch(e) {}
+        return { error: (err === 'access_denied' || err === 'user_canceled') ? 'cancelado' : err };
+      }
+      const code = params.get('code');
+      if (!code) {
+        try { history.replaceState(null, '', location.pathname); } catch(e) {}
+        return null;
+      }
+      const savedState = sessionStorage.getItem('sigrOauthState') || '';
+      try { sessionStorage.removeItem('sigrOauthState'); } catch(e) {}
+      const state = params.get('state');
+      if (savedState && state && state !== savedState) {
+        try { history.replaceState(null, '', location.pathname); } catch(e) {}
+        return { error: 'La sesión no es válida. Inténtalo de nuevo.' };
+      }
+
+      const cred = await this.getClientCredential();
+      let json;
+      try {
+        json = await this._exchangeCode(code, cred.clientId, cred.clientSecret);
+      } catch(e) {
+        try { history.replaceState(null, '', location.pathname); } catch(e) {}
         throw e;
       }
+      try { history.replaceState(null, '', location.pathname); } catch(e) {}
+
+      let email = '';
+      try {
+        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo?alt=json', {
+          headers: { Authorization: 'Bearer ' + json.access_token }
+        });
+        const info = await res.json().catch(() => ({}));
+        email = info.email || '';
+      } catch(e) {}
+
+      let account = this._accounts.find(a => a.type === 'oauth' && a.email === email);
+      if (!account) {
+        account = {
+          id: 'web-' + Date.now(),
+          type: 'oauth',
+          web: true,
+          name: email ? email.split('@')[0] : 'Cuenta de Google',
+          email: email,
+          clientId: cred.clientId,
+          accessToken: null,
+          refreshToken: json.refresh_token || '',
+          expiresAt: 0,
+          createdAt: Date.now()
+        };
+        this._accounts.push(account);
+      } else {
+        if (json.refresh_token) account.refreshToken = json.refresh_token;
+        account.clientId = cred.clientId;
+      }
+      account.accessToken = json.access_token;
+      account.expiresAt = Date.now() + (json.expires_in - 60) * 1000;
+      this._persist();
+      return { account: account };
     },
 
     /* ----- account management ----- */
