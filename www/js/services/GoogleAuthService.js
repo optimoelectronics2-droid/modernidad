@@ -79,26 +79,52 @@
       } catch(e) { return null; }
     },
 
-    /* Client ID tipo "Aplicación web" guardado en la app (lo pegas en Copias de seguridad) */
-    async getWebClientId() {
+    /* Client ID y Client Secret guardados en la app (los pegas en Copias de seguridad) */
+    async getClientCredential() {
       try {
         const cfg = await window.SIGR.BackupService.getConfig();
-        return (cfg.webClientId || WEB_CLIENT_ID || '').trim();
+        return {
+          clientId: (cfg.webClientId || WEB_CLIENT_ID || '').trim(),
+          clientSecret: (cfg.clientSecret || '').trim()
+        };
       } catch(e) {
-        return WEB_CLIENT_ID.trim();
+        return { clientId: WEB_CLIENT_ID.trim(), clientSecret: '' };
       }
     },
 
-    async setWebClientId(cid) {
+    async setClientCredential(clientId, clientSecret) {
       const cfg = await window.SIGR.BackupService.getConfig();
-      cfg.webClientId = (cid || '').trim();
+      cfg.webClientId = (clientId || '').trim();
+      cfg.clientSecret = (clientSecret || '').trim();
       await window.SIGR.BackupService.saveConfig(cfg);
+    },
+
+    /* Acepta el JSON descargado de la consola (tiene client_id + client_secret) o solo el Client ID */
+    async saveClientInput(raw) {
+      const text = (raw || '').trim();
+      if (text.startsWith('{')) {
+        let parsed = null;
+        try { parsed = JSON.parse(text); } catch(e) { throw new Error('El JSON no es válido. Descárgalo de nuevo desde la consola.'); }
+        const cid = (parsed.client_id || (parsed.web && parsed.web.client_id) || '').trim();
+        const sec = (parsed.client_secret || (parsed.web && parsed.web.client_secret) || '').trim();
+        if (!/^[\w.-]+\.apps\.googleusercontent\.com$/.test(cid)) {
+          throw new Error('El JSON no contiene un client_id válido. Verifica que descargaste el JSON de un cliente OAuth.');
+        }
+        await this.setClientCredential(cid, sec);
+        return { clientId: cid, clientSecret: sec };
+      }
+      if (!/^[\w.-]+\.apps\.googleusercontent\.com$/.test(text)) {
+        throw new Error('Eso no parece un Client ID de Google (debe terminar en .apps.googleusercontent.com)');
+      }
+      await this.setClientCredential(text, '');
+      return { clientId: text, clientSecret: '' };
     },
 
     /* Professional "Sign in with Google" (account picker popup). Falls back to device flow. */
     async signInWithGoogle() {
-      const cid = await this.getWebClientId();
-      if (!cid) return this.startDeviceFlow();
+      const cred = await this.getClientCredential();
+      const cid = cred.clientId;
+      if (!cid) return this.startDeviceFlow(DEFAULT_CLIENT_ID, cred.clientSecret);
 
       try {
         const g = await this._gisLoad();
@@ -146,7 +172,7 @@
         return account;
       } catch(e) {
         if (/canceled|denied|rechaz/i.test(e.message)) throw e;
-        return this.startDeviceFlow();
+        return this.startDeviceFlow(cid, cred.clientSecret);
       }
     },
 
@@ -230,8 +256,9 @@
 
     /* ----- device flow (fallback: TV client ID) ----- */
 
-    async startDeviceFlow(clientId) {
+    async startDeviceFlow(clientId, clientSecret) {
       const cid = ((clientId || '').trim() || DEFAULT_CLIENT_ID).trim();
+      const sec = (clientSecret || '').trim();
       if (!/^[\w.-]+\.apps\.googleusercontent\.com$/.test(cid)) {
         throw new Error('No parece un Client ID válido. Debe terminar en ".apps.googleusercontent.com" y copiarse completo de la consola de Google.');
       }
@@ -246,7 +273,8 @@
         verificationUrl: json.verification_url,
         expiresIn: json.expires_in,
         interval: Math.max(5, json.interval || 5),
-        clientId: cid
+        clientId: cid,
+        clientSecret: sec
       };
     },
 
@@ -256,10 +284,11 @@
         if (shouldStop && shouldStop()) throw new Error('__stopped__');
         await new Promise(r => setTimeout(r, flow.interval * 1000));
         if (shouldStop && shouldStop()) throw new Error('__stopped__');
-        const { status, json } = await this._postForm(TOKEN_URI,
-          'client_id=' + encodeURIComponent(flow.clientId) +
+        let body = 'client_id=' + encodeURIComponent(flow.clientId) +
           '&device_code=' + encodeURIComponent(flow.deviceCode) +
-          '&grant_type=urn:ietf:params:oauth:grant-type:device_code');
+          '&grant_type=urn:ietf:params:oauth:grant-type:device_code';
+        if (flow.clientSecret) body += '&client_secret=' + encodeURIComponent(flow.clientSecret);
+        const { status, json } = await this._postForm(TOKEN_URI, body);
         if (status === 200 && json.access_token) {
           return {
             accessToken: json.access_token,
@@ -271,11 +300,8 @@
         if (json.error === 'slow_down') { flow.interval += 5; continue; }
         if (json.error === 'access_denied') throw new Error('Acceso denegado por el usuario');
         if (json.error === 'expired_token') throw new Error('El código expiró. Pulsa de nuevo "Iniciar sesión con Google"');
-        if (json.error === 'invalid_grant' || status === 400) {
-          if (json.error_description && /already|used|expired/i.test(json.error_description)) {
-            throw new Error('La autorización ya se procesó o el código expiró. Comprueba si tu cuenta ya aparece en la lista.');
-          }
-          throw new Error('Código inválido: asegúrate de escribir el código exacto que muestra la app');
+        if (status === 400 || json.error === 'invalid_grant' || json.error === 'invalid_client') {
+          throw new Error('No se pudo completar la autorización: ' + (json.error_description || json.error || 'error') + '. Revisa que en Copias de seguridad pegaste el JSON completo del cliente OAuth (Client ID + Client Secret).');
         }
         throw new Error(json.error_description || json.error || 'Error de autenticación');
       }
