@@ -84,10 +84,10 @@
     el.querySelector('.pin-pad').addEventListener('click', async function(e){
       var btn = e.target.closest('.pk-btn');
       if (!btn) return;
-      var n = btn.dataset.num;
+      var n = btn.dataset.n;
       if (n === 'del'){
         if (input.length > 0){ input = input.slice(0,-1); }
-      } else if (input.length < 4){
+      } else if (n && /^\d$/.test(n) && input.length < 4){
         input += n;
       }
       dots.forEach(function(d,i){ d.classList.toggle('fill', i < input.length); });

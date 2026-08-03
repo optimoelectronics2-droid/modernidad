@@ -155,6 +155,7 @@
         case 'bsConnectPersonal': {
           const btn = el;
           btn.disabled = true;
+          btn.textContent = 'Abriendo Google…';
           try {
             const res = await GA.signInWithGoogle();
             if (res.userCode) {
@@ -169,8 +170,10 @@
               </div>`;
               window.openModal({ title: 'Iniciar sesión con Google', body, closeOnOverlay: false });
               try { await navigator.clipboard.writeText(res.userCode); } catch(e) {}
+              btn.textContent = '＋ Iniciar sesión con Google';
               this._pollDevice(res);
             } else {
+              btn.textContent = '＋ Iniciar sesión con Google';
               showToast('Sesión iniciada: ' + (res.email || 'Google') + ' ✓');
               const cfg = await BS.getConfig();
               if (!cfg.activeAccountId) {
@@ -180,8 +183,27 @@
               this.refresh();
             }
           } catch(e) {
-            showToast(e.message || 'No se pudo iniciar sesión');
+            btn.textContent = '＋ Iniciar sesión con Google';
             btn.disabled = false;
+            window.showConfirm((e.message || 'No se pudo iniciar sesión') + ' ¿Quieres ver el método alternativo (código)?', 'Sí, ver método de código', async () => {
+              try {
+                const res = await GA.startDeviceFlow();
+                if (!res || !res.userCode) { showToast('No se pudo generar el código'); return; }
+                this._state.flow = res;
+                const body = `<div style="text-align:center;padding:12px 0">
+                  <div style="font-size:13px;color:var(--text-dim);margin-bottom:10px">Toca el botón para abrir Google, escribe el código y acepta los permisos:</div>
+                  <button class="btn" data-action="bsOpenDevicePage" style="width:100%;margin-bottom:12px">🌐 Abrir página de Google</button>
+                  <div style="font-size:34px;font-weight:800;letter-spacing:8px;color:#12D68A;margin-bottom:10px">${esc(res.userCode)}</div>
+                  <button class="btn btn-ghost" data-action="bsCopyUserCode" style="font-size:12px;margin-bottom:12px">📋 Copiar código</button>
+                  <div id="bsDeviceStatus" style="font-size:12px;color:var(--text-faint)">Esperando autorización…</div>
+                </div>`;
+                window.openModal({ title: 'Iniciar sesión con Google', body, closeOnOverlay: false });
+                try { await navigator.clipboard.writeText(res.userCode); } catch(e) {}
+                this._pollDevice(res);
+              } catch(e2) {
+                showToast(e2.message || 'No se pudo iniciar sesión');
+              }
+            });
           }
           break;
         }
