@@ -1743,6 +1743,7 @@
   window.SIGR.PRI_COLORS = PRI_COLORS;
   window.SIGR.DB = DB;
   window.SIGR.render = render;
+  window.SIGR.loadAll = loadAll;
   window.SIGR.attachHandlers = attachHandlers;
   window.SIGR.attachGlobalEvents = attachGlobalEvents;
   window.SIGR.openBackupSettingsView = openBackupSettingsView;

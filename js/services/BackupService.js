@@ -10,6 +10,7 @@
   const FORMAT_VERSION = 2;
 
   const BackupService = {
+    FORMAT: FORMAT,
     _passphrase: null,
     _memConfig: null,
 
@@ -65,6 +66,16 @@
     },
 
     /* ---------------- snapshot build / parse ---------------- */
+
+    async _snapshotFingerprint() {
+      try {
+        const records = await this._collectRecords();
+        const stores = await window.SIGR.StorageService.getAllStoresData();
+        delete stores.syncQueue;
+        return JSON.stringify({ records: records, stores: stores }).length + ':' +
+          Object.keys(records).reduce((a, m) => a + JSON.stringify(records[m] || []).length, 0);
+      } catch(e) { return String(Date.now()); }
+    },
 
     async _collectRecords() {
       const records = {};

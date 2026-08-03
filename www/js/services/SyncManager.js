@@ -19,6 +19,7 @@
     _lastErrorAt: 0,
     _lastSuccessAt: 0,
     _failureCount: 0,
+    _lastPullAt: 0,
 
     init: async function() {
       window.addEventListener('online', () => {
@@ -85,6 +86,48 @@
       return typeof navigator !== 'undefined' && navigator.onLine;
     },
 
+    /* Baja la copia mas reciente de Drive y la fusiona con los datos locales
+       (sincronizacion bidireccional entre dispositivos). */
+    async pull() {
+      const cfg = await window.SIGR.BackupService.getConfig();
+      const accounts = window.SIGR.GoogleAuthService.getAccounts();
+      const personal = accounts.filter(a => a.type === 'oauth');
+      const candidates = personal.length ? personal : accounts;
+      const account = candidates.find(a => a.id === cfg.activeAccountId) || candidates[0];
+      if (!account) return null;
+
+      let backups = [];
+      try { backups = await window.SIGR.BackupService.listBackups(account.id); } catch(e) { return null; }
+      if (!backups.length) return null;
+      const latest = backups[0];
+      if (cfg.lastPull && cfg.lastPull.fileId === latest.id) return null;
+
+      const blob = await window.SIGR.BackupService.downloadBackup(account.id, latest.id);
+      const pass = window.SIGR.BackupService.getPassphrase() || undefined;
+      const snapshot = await window.SIGR.BackupService.parseBackupBlob(blob, pass);
+      if (!snapshot || snapshot.format !== window.SIGR.BackupService.FORMAT) return null;
+
+      const before = await window.SIGR.BackupService._snapshotFingerprint();
+      await window.SIGR.BackupService._mergeSnapshot(snapshot);
+      const after = await window.SIGR.BackupService._snapshotFingerprint();
+
+      cfg.lastPull = {
+        fileId: latest.id,
+        at: Date.now(),
+        name: latest.name,
+        from: snapshot.deviceId || 'desconocido',
+        createdTime: latest.createdTime,
+        changed: after !== before
+      };
+      await window.SIGR.BackupService.saveConfig(cfg);
+
+      if (after !== before) {
+        try { await window.SIGR.loadAll(); } catch(e) {}
+        try { window.SIGR.StateService && window.SIGR.StateService.notify(); } catch(e) {}
+      }
+      return cfg.lastPull;
+    },
+
     async process() {
       if (this._running) return;
       if (!this.isOnline()) return;
@@ -102,7 +145,35 @@
           cfg.activeAccountId = account.id;
           await window.SIGR.BackupService.saveConfig(cfg).catch(() => {});
         }
-        if (!account) return;
+        if (!account) {
+          this._setStatus({ state: 'idle', message: 'Conecta tu cuenta de Google en Copias de seguridad para sincronizar', lastSync: Date.now() });
+          return;
+        }
+
+        /* 1) primero baja y fusiona lo que haya en Drive (cada 5 min como maximo) */
+        const nowP = Date.now();
+        let forceUpload = false;
+        if (nowP - (this._lastPullAt || 0) >= 300000) {
+          this._lastPullAt = nowP;
+          try {
+            const pulled = await this.pull();
+            if (pulled) {
+              forceUpload = !!pulled.changed;
+              if (pulled.changed && typeof window.showToast === 'function') {
+                try { window.showToast('Sincronizado: llegaron datos de ' + (pulled.from || 'Drive')); } catch(err) {}
+              }
+              this._setStatus({
+                state: 'idle',
+                message: pulled.changed
+                  ? 'Datos sincronizados desde ' + (pulled.from || 'Drive') + ': se fusionaron tus notas'
+                  : 'Sincronizado con Drive (' + (pulled.from || 'última copia') + ')',
+                lastSync: Date.now()
+              });
+            }
+          } catch(e) {
+            console.warn('SyncManager pull:', e);
+          }
+        }
 
         let queueSize = 0;
         try { queueSize = (await window.SIGR.StorageService.getSyncQueue()).length; } catch(e) {}
@@ -111,7 +182,7 @@
         const lastBackupAt = cfg.lastBackup ? cfg.lastBackup.at : 0;
         const dueInterval = (cfg.intervalHours || 6) * 3600000;
         const queueDirty = queueSize > 0;
-        const intervalDue = queueDirty || lastBackupAt === 0 || now - lastBackupAt >= dueInterval;
+        const intervalDue = queueDirty || forceUpload || lastBackupAt === 0 || now - lastBackupAt >= dueInterval;
 
         if (!intervalDue && !queueDirty) {
           this._setStatus({ state: 'idle', message: 'Sin cambios pendientes', queueSize: queueSize, lastSync: now });
@@ -126,6 +197,9 @@
         this._failureCount = 0;
         cfg.lastError = null;
         await window.SIGR.BackupService.saveConfig(cfg);
+        if (typeof window.showToast === 'function') {
+          try { window.showToast('Copia de seguridad subida a Google Drive ✓'); } catch(err) {}
+        }
         this._setStatus({
           state: 'idle',
           queueSize: 0,
